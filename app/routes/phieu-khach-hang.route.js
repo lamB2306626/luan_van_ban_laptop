@@ -9,6 +9,8 @@ router
   .post(phieuKhachhang.create)
   .delete(phieuKhachhang.deleteAll);
 
+router.route("/tang-phieu").post(phieuKhachhang.tangPhieuByAdmin);
+
 router
   .route("/:id")
   .get(phieuKhachhang.findOne)

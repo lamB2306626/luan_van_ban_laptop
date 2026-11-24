@@ -18,6 +18,7 @@
         <tr>
           <th>Mã Phiếu</th>
           <th>Nhân Viên Lập</th>
+          <th>Nhà Cung Cấp</th>
           <th>Ngày Nhập</th>
           <th>Tổng Tiền</th>
           <th style="width: 220px">Hành động</th>
@@ -28,6 +29,9 @@
           <td>{{ phieuNhap.id }}</td>
           <td>
             {{ phieuNhap.nhan_vien?.ho_ten || phieuNhap.id_nhan_vien }}
+          </td>
+          <td>
+            {{ phieuNhap.nha_cung_cap?.ten_ncc || phieuNhap.id_ncc }}
           </td>
           <td>{{ formatDate(phieuNhap.ngay_nhap) }}</td>
           <td class="fw-bold text-success">
@@ -122,7 +126,9 @@ export default {
 
     // ==================== 4. Xóa một Phiếu Nhập đơn lẻ ====================
     async deletePhieuNhap(id) {
-      if (confirm(`Bạn có chắc chắn muốn xóa Phiếu Nhập có mã "${id}" không?`)) {
+      if (
+        confirm(`Bạn có chắc chắn muốn xóa Phiếu Nhập có mã "${id}" không?`)
+      ) {
         try {
           await PhieuNhapService.delete(id);
           alert("Xóa Phiếu Nhập thành công!");
@@ -145,12 +151,12 @@ export default {
     // ==================== 5. Xóa tất cả Phiếu Nhập ====================
     async deleteAllPhieuNhaps() {
       const confirm1 = confirm(
-        "CẢNH BÁO: Bạn có chắc chắn muốn xóa TẤT CẢ Phiếu Nhập không? Hành động này không thể hoàn tác!"
+        "CẢNH BÁO: Bạn có chắc chắn muốn xóa TẤT CẢ Phiếu Nhập không? Hành động này không thể hoàn tác!",
       );
 
       if (confirm1) {
         const confirm2 = confirm(
-          "BẠN CÓ THỰC SỰ CHẮC CHẮN? Tất cả dữ liệu Phiếu Nhập sẽ bị xóa sạch hoàn toàn!"
+          "BẠN CÓ THỰC SỰ CHẮC CHẮN? Tất cả dữ liệu Phiếu Nhập sẽ bị xóa sạch hoàn toàn!",
         );
 
         if (confirm2) {

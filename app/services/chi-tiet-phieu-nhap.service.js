@@ -1,5 +1,4 @@
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+const prisma = require("../utils/prisma");
 
 class ChiTietPhieuNhapService {
   // Lọc lấy các trường thuộc tính hợp lệ
@@ -59,37 +58,46 @@ class ChiTietPhieuNhapService {
   }
 
   // ==================== 1. Tạo Chi Tiết Phiếu Nhập & Cập nhật Kho ====================
-  async create(payload) {
-    const data = this.extractChiTietPhieuNhapData(payload);
+  async create(payload, externalTx = null) {
+    // Hàm thực thi chính (Nhận client tx từ ngoài hoặc dùng prisma mặc định)
+    const execute = async (tx) => {
+      // Ép payload về dạng Mảng để xử lý đồng nhất (dù client truyền 1 object hay mảng object)
+      const items = Array.isArray(payload) ? payload : [payload];
+      if (items.length === 0) return [];
 
-    const existingDetail = await prisma.chi_tiet_phieu_nhap.findFirst({
-      where: {
-        id_phieu_nhap: data.id_phieu_nhap,
-        id_bien_the: data.id_bien_the,
-      },
-    });
+      const results = [];
 
-    if (existingDetail) {
-      throw new Error("BIEN_THE_DA_TON_TAI_TRONG_PHIEU_NHAP");
-    }
-
-    if (!data.id) {
-      const lastChiTiet = await prisma.chi_tiet_phieu_nhap.findFirst({
+      // Lấy mã CTPN lớn nhất hiện tại trong DB
+      const lastChiTiet = await tx.chi_tiet_phieu_nhap.findFirst({
         orderBy: { id: "desc" },
       });
 
-      if (!lastChiTiet) {
-        data.id = "CTPN01";
-      } else {
-        const currentNumber =
-          parseInt(lastChiTiet.id.replace(/\D/g, ""), 10) || 0;
-        data.id = `CTPN${String(currentNumber + 1).padStart(2, "0")}`;
-      }
-    }
+      let currentNumber = lastChiTiet
+        ? parseInt(lastChiTiet.id.replace(/\D/g, ""), 10) || 0
+        : 0;
 
-    try {
-      return await prisma.$transaction(async (tx) => {
-        // Thao tác 1: Tạo chi tiết phiếu nhập
+      for (const item of items) {
+        const data = this.extractChiTietPhieuNhapData(item);
+
+        // Kiểm tra trùng biến thể trong cùng phiếu nhập
+        const existingDetail = await tx.chi_tiet_phieu_nhap.findFirst({
+          where: {
+            id_phieu_nhap: data.id_phieu_nhap,
+            id_bien_the: data.id_bien_the,
+          },
+        });
+
+        if (existingDetail) {
+          throw new Error(`BIEN_THE_DA_TON_TAI_TRONG_PHIEU_NHAP`);
+        }
+
+        // Tự động tăng số đếm để sinh mã CTPN01, CTPN02 duy nhất cho từng item
+        if (!data.id) {
+          currentNumber += 1;
+          data.id = `CTPN${String(currentNumber).padStart(4, "0")}`;
+        }
+
+        // Thao tác 1: Tạo bản ghi chi tiết
         const newDetail = await tx.chi_tiet_phieu_nhap.create({
           data: data,
           include: {
@@ -98,22 +106,28 @@ class ChiTietPhieuNhapService {
           },
         });
 
-        // Thao tác 2: Cộng số lượng nhập vào kho biến thể
+        // Thao tác 2: Cộng số lượng nhập vào kho biến thể (sử dụng tx)
         await this.updateKhoBienThe(data.id_bien_the, data.so_luong_nhap, tx);
 
-        // Thao tác 3: Tính toán lại tổng tiền phiếu nhập
-        await this.recalculateTongTienPhieuNhap(data.id_phieu_nhap, tx);
+        results.push(newDetail);
+      }
 
-        return newDetail;
+      // Thao tác 3: Tính toán lại tổng tiền phiếu nhập 1 lần duy nhất sau khi xong hết mảng
+      if (items.length > 0 && items[0].id_phieu_nhap) {
+        await this.recalculateTongTienPhieuNhap(items[0].id_phieu_nhap, tx);
+      }
+
+      // Nếu truyền 1 item thì trả về object, truyền mảng thì trả về mảng
+      return Array.isArray(payload) ? results : results[0];
+    };
+
+    // Nếu service cha truyền `externalTx` vào thì dùng luôn, nếu không thì tự mở transaction riêng
+    if (externalTx) {
+      return await execute(externalTx);
+    } else {
+      return await prisma.$transaction(async (tx) => {
+        return await execute(tx);
       });
-    } catch (error) {
-      if (error.code === "P2002") {
-        throw new Error("BIEN_THE_DA_TON_TAI_TRONG_PHIEU_NHAP");
-      }
-      if (error.code === "P2003") {
-        throw new Error("KHOA_NGOAI_KHONG_TON_TAI");
-      }
-      throw error;
     }
   }
 

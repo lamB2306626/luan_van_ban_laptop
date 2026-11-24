@@ -34,6 +34,11 @@ class ThongBaoService {
   async deleteAll() {
     return (await this.api.delete("/")).data;
   }
+
+  // 7. Đếm số thông báo chưa đọc theo ID khách hàng
+  async countUnreadByKhachHangId(id_khach_hang) {
+    return (await this.api.get(`/count/${id_khach_hang}`)).data;
+  }
 }
 
 export default new ThongBaoService();

@@ -21,6 +21,15 @@ exports.create = async (req, res, next) => {
       data: document,
     });
   } catch (error) {
+    if (error.message === "VUOT_QUA_GIOI_HAN_TOI_DA_3_SAN_PHAM") {
+      return next(
+        new ApiError(
+          400,
+          "Mỗi lần mua được thêm tối đa 3 sản phẩm cho mỗi phân loại",
+        ),
+      );
+    }
+
     if (error.message === "SO_LUONG_TON_KHO_KHONG_DU") {
       return next(
         new ApiError(
@@ -76,7 +85,12 @@ exports.findAll = async (req, res, next) => {
 // ============================== 3. Cập nhật Chi Tiết Đơn Hàng theo mã ==================================
 exports.update = async (req, res, next) => {
   if (Object.keys(req.body).length === 0) {
-    return next(new ApiError(400, "Dữ liệu cập nhật không được để trống"));
+    return next(
+      new ApiError(
+        400,
+        "Dữ liệu cập nhật không được để trống không được để trống",
+      ),
+    );
   }
 
   try {

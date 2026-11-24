@@ -1,25 +1,23 @@
 <template>
   <Form @submit="submitBienThe" :validation-schema="bienTheFormSchema">
-    <!-- Mã Biến Thể & Mã Sản Phẩm (Chỉ hiển thị disabled khi Edit) -->
-    <div v-if="isEdit" class="row">
-      <div class="col-md-6 form-group mb-3">
-        <label for="id">Mã Biến Thể:</label>
-        <Field
-          name="id"
+    <!-- Mã Biến Thể & Mã Sản Phẩm -->
+    <!-- Kiểm tra hasRealIds để nếu là Form tạm trong trang thêm mới sản phẩm thì không cần hiện -->
+    <div v-if="hasRealIds" class="row mb-3">
+      <div class="col-md-6">
+        <label class="form-label fw-semibold">Mã Biến Thể:</label>
+        <input
           type="text"
-          class="form-control"
-          v-model="bienTheLocal.id"
+          class="form-control bg-light"
+          :value="bienTheLocal.id"
           disabled
         />
       </div>
-
-      <div class="col-md-6 form-group mb-3">
-        <label for="id_san_pham">Mã Sản Phẩm:</label>
-        <Field
-          name="id_san_pham"
+      <div class="col-md-6">
+        <label class="form-label fw-semibold">Mã Sản Phẩm:</label>
+        <input
           type="text"
-          class="form-control"
-          v-model="bienTheLocal.id_san_pham"
+          class="form-control bg-light"
+          :value="bienTheLocal.id_san_pham"
           disabled
         />
       </div>
@@ -36,22 +34,14 @@
               :options="dsCpu"
               label-key="ten_cpu"
               value-key="id"
-              placeholder="Nhập tên hoặc mã GPU để tìm..."
+              placeholder="Nhập tên hoặc mã CPU để tìm..."
               class="flex-grow-1"
-            >
-              <!-- thêm class="flex-grow-1" cho giao diện trang cân bằng BaseSearchSelect và button bên dưới -->
-
-              <!-- Custom lại cách hiển thị danh sách dạng [MÃ] TÊN -->
-              <!-- <template #option="{ item }">
-                <span class="fw-bold text-secondary">[{{ item.id }}]</span>
-                {{ item.ten_cpu }}
-              </template> -->
-            </BaseSearchSelect>
+            />
           </Field>
           <button
             type="button"
             class="btn btn-outline-success"
-            title="Thêm Màu Sắc mới"
+            title="Thêm CPU mới"
             @click="openQuickCreate('cpu')"
           >
             <i class="fas fa-plus"></i>
@@ -73,15 +63,7 @@
               value-key="id"
               placeholder="Nhập tên hoặc mã GPU để tìm..."
               class="flex-grow-1"
-            >
-              <!-- thêm class="flex-grow-1" cho giao diện trang cân bằng BaseSearchSelect và button bên dưới -->
-
-              <!-- Custom lại cách hiển thị danh sách dạng [MÃ] TÊN -->
-              <!-- <template #option="{ item }">
-                <span class="fw-bold text-secondary">[{{ item.id }}]</span>
-                {{ item.ten_gpu }}
-              </template> -->
-            </BaseSearchSelect>
+            />
           </Field>
           <button
             type="button"
@@ -109,13 +91,7 @@
               value-key="id"
               placeholder="Nhập tên hoặc mã Dung Lượng Ram để tìm..."
               class="flex-grow-1"
-            >
-              <!-- Custom lại cách hiển thị danh sách dạng [MÃ] TÊN -->
-              <!-- <template #option="{ item }">
-                <span class="fw-bold text-secondary">[{{ item.id }}]</span>
-                {{ item.dung_luong_ram }}
-              </template> -->
-            </BaseSearchSelect>
+            />
           </Field>
           <button
             type="button"
@@ -142,13 +118,7 @@
               value-key="id"
               placeholder="Nhập tên hoặc mã Dung Lượng Rom để tìm..."
               class="flex-grow-1"
-            >
-              <!-- Custom lại cách hiển thị danh sách dạng [MÃ] TÊN -->
-              <!-- <template #option="{ item }">
-                <span class="fw-bold text-secondary">[{{ item.id }}]</span>
-                {{ item.dung_luong_rom }}
-              </template> -->
-            </BaseSearchSelect>
+            />
           </Field>
           <button
             type="button"
@@ -163,7 +133,7 @@
       </div>
     </div>
 
-    <!-- Màu sắc & Đường dẫn ảnh -->
+    <!-- Màu sắc & Giá bán -->
     <div class="row">
       <div class="col-md-6 form-group mb-3">
         <label for="id_mau_sac"
@@ -178,13 +148,7 @@
               value-key="id"
               placeholder="Nhập tên hoặc mã Màu Sắc để tìm..."
               class="flex-grow-1"
-            >
-              <!-- Custom lại cách hiển thị danh sách dạng [MÃ] TÊN
-              <template #option="{ item }">
-                <span class="fw-bold text-secondary">[{{ item.id }}]</span>
-                {{ item.ten_mau_sac }}
-              </template> -->
-            </BaseSearchSelect>
+            />
           </Field>
           <button
             type="button"
@@ -198,37 +162,6 @@
         <ErrorMessage name="id_mau_sac" class="text-danger small" />
       </div>
 
-      <!-- Upload Logo / Hình ảnh -->
-      <div class="col-md-6 form-group mb-3">
-        <label for="duong_dan_anh"
-          >Ảnh biến thể <span class="text-danger">*</span>:</label
-        >
-        <Field name="duong_dan_anh" v-slot="{ field, errors }">
-          <input
-            type="file"
-            id="duong_dan_anh"
-            class="form-control"
-            accept="image/*"
-            @change="handleFileChange"
-          />
-        </Field>
-
-        <ErrorMessage name="duong_dan_anh" class="text-danger small" />
-
-        <!-- Khung xem trước (Preview) ảnh -->
-        <div v-if="previewImage" class="mt-2 text-center">
-          <img
-            :src="previewImage"
-            alt="Preview Image"
-            class="img-thumbnail"
-            style="max-height: 120px; object-fit: contain"
-          />
-        </div>
-      </div>
-    </div>
-
-    <!-- Giá bán lẻ & Số lượng tồn kho -->
-    <div class="row">
       <div class="col-md-6 form-group mb-3">
         <label for="gia"
           >Giá Bán (VNĐ) <span class="text-danger">*</span>:</label
@@ -245,17 +178,6 @@
       </div>
     </div>
 
-    <!-- Trạng thái kinh doanh -->
-    <!-- <div class="form-group mb-3 form-check">
-      <input
-        type="checkbox"
-        class="form-check-input"
-        id="trang_thai"
-        v-model="bienTheLocal.trang_thai"
-      />
-      <label class="form-check-label" for="trang_thai">Cho phép kinh doanh biến thể này</label>
-    </div> -->
-
     <!-- Các nút hành động -->
     <div class="form-group mt-4 text-end">
       <button type="button" class="btn btn-secondary me-2" @click="cancel">
@@ -266,6 +188,7 @@
       </button>
     </div>
   </Form>
+
   <!-- Đặt QuickCreateModal ở cuối Template -->
   <QuickCreateModal ref="quickCreateModal" @created="handleQuickCreated" />
 </template>
@@ -287,8 +210,6 @@ import QuickCreateModal from "@/components/Common/QuickCreateModal.vue";
 // Import Modal Vừa tìm, vừa chọn Dùng Chung
 import BaseSearchSelect from "@/components/Common/BaseSearchSelect.vue";
 
-const API_URL = import.meta.env.VITE_API_BASE_URL;
-
 export default {
   name: "BienTheForm",
   components: {
@@ -308,16 +229,13 @@ export default {
         id_ram: "",
         id_rom: "",
         gia: 0,
-        // so_luong: 0,
-        duong_dan_anh: "",
-        // trang_thai: true,
       }),
     },
     isEdit: { type: Boolean, default: false },
   },
   emits: ["submit:bienThe", "cancel"],
   data() {
-    // Schema kiểm tra tính hợp lệ dữ liệu theo Prisma Model
+    // Schema kiểm tra tính hợp lệ dữ liệu (Không còn validate ảnh)
     const bienTheFormSchema = yup.object().shape({
       id_mau_sac: yup.string().required("Vui lòng chọn màu sắc."),
       id_cpu: yup.string().required("Vui lòng chọn CPU."),
@@ -329,14 +247,6 @@ export default {
         .typeError("Giá phải là một chữ số.")
         .required("Giá bán không được để trống.")
         .min(0, "Giá bán không được nhỏ hơn 0."),
-      duong_dan_anh: yup
-        .mixed()
-        .test("check-image", "Vui lòng chọn ảnh cho biến thể.", () => {
-          // Nếu đang Sửa (isEdit) thì không bắt buộc chọn file mới (vì đã có ảnh cũ)
-          if (this.isEdit) return true;
-          // Nếu là Thêm mới thì bắt buộc phải chọn file
-          return !!this.selectedFile;
-        }),
     });
 
     return {
@@ -347,19 +257,26 @@ export default {
       dsRom: [],
       dsMauSac: [],
       bienTheFormSchema,
-      selectedFile: null, // File hình ảnh được chọn từ máy
-      previewImage: this.bienThe?.duong_dan_anh
-        ? `${API_URL}/uploads/BienThe/${this.bienThe.duong_dan_anh}`
-        : null, // Ảnh hiển thị preview
     };
+  },
+  computed: {
+    // Computed kiểm tra mã biến thể có thật không
+    hasRealIds() {
+      const id = this.bienTheLocal?.id;
+
+      // Nếu không có ID hoặc là mã tạm BT_TAM_ -> Ẩn
+      if (!id || (typeof id === "string" && id.startsWith("BT_TAM_"))) {
+        return false;
+      }
+
+      // Có ID thật từ DB -> Hiện
+      return true;
+    },
   },
   watch: {
     bienThe: {
       handler(newVal) {
         this.bienTheLocal = { ...newVal };
-        if (newVal?.duong_dan_anh && !this.selectedFile) {
-          this.previewImage = `${API_URL}/uploads/BienThe/${newVal.duong_dan_anh}`; //previewImage sẽ tự cập nhật
-        }
       },
       deep: true,
     },
@@ -385,48 +302,56 @@ export default {
       }
     },
 
-    // Xử lý khi chọn file từ máy tính
-    handleFileChange(event) {
-      const file = event.target.files[0];
-      if (file) {
-        this.selectedFile = file;
-        // Tạo URL xem trước ảnh bằng FileReader
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          this.previewImage = e.target.result;
-        };
-        reader.readAsDataURL(file);
-      }
-    },
-
-    // Phát sự kiện submit kèm dữ liệu FormData ra cho Component cha
+    // Phát sự kiện submit kèm dữ liệu OBJECT THUẦN TÚY ra cho Component cha
     submitBienThe() {
-      const formData = new FormData();
-      formData.append("id_mau_sac", this.bienTheLocal.id_mau_sac || "");
-      formData.append("id_cpu", this.bienTheLocal.id_cpu || "");
-      formData.append("id_gpu", this.bienTheLocal.id_gpu || "");
-      formData.append("id_ram", this.bienTheLocal.id_ram || "");
-      formData.append("id_rom", this.bienTheLocal.id_rom || "");
-      formData.append("gia", this.bienTheLocal.gia || "");
-      // formData.append("so_luong", this.bienTheLocal.so_luong);
-      // formData.append("trang_thai", this.bienTheLocal.trang_thai || "");
+      // Tìm object thông tin linh kiện tương ứng để BienTheTable có thông tin hiển thị tên
+      const selectedCpu = this.dsCpu.find(
+        (item) => item.id === this.bienTheLocal.id_cpu,
+      );
+      const selectedGpu = this.dsGpu.find(
+        (item) => item.id === this.bienTheLocal.id_gpu,
+      );
+      const selectedRam = this.dsRam.find(
+        (item) => item.id === this.bienTheLocal.id_ram,
+      );
+      const selectedRom = this.dsRom.find(
+        (item) => item.id === this.bienTheLocal.id_rom,
+      );
+      const selectedMauSac = this.dsMauSac.find(
+        (item) => item.id === this.bienTheLocal.id_mau_sac,
+      );
 
-      // CHỈ append file được chọn từ máy tính
-      if (this.selectedFile) {
-        formData.append("image", this.selectedFile);
-      }
+      const payload = {
+        ...this.bienTheLocal,
+        gia: Number(this.bienTheLocal.gia || 0),
+        id_mau_sac: this.bienTheLocal.id_mau_sac || "",
+        id_cpu: this.bienTheLocal.id_cpu || "",
+        id_gpu: this.bienTheLocal.id_gpu || "",
+        id_dung_luong_ram:
+          this.bienTheLocal.id_ram || this.bienTheLocal.id_dung_luong_ram || "",
+        id_dung_luong_rom:
+          this.bienTheLocal.id_rom || this.bienTheLocal.id_dung_luong_rom || "",
+
+        // Đính kèm các object hiển thị cho BienTheTable
+        cpu: selectedCpu || null,
+        gpu: selectedGpu || null,
+        dung_luong_ram: selectedRam || null,
+        dung_luong_rom: selectedRom || null,
+        mau_sac: selectedMauSac || null,
+      };
 
       if (this.isEdit && this.bienTheLocal.id) {
-        formData.append("id", this.bienTheLocal.id);
+        payload.id = this.bienTheLocal.id;
       }
 
-      this.$emit("submit:bienThe", formData);
+      this.$emit("submit:bienThe", payload);
     },
 
     cancel() {
       this.$emit("cancel");
     },
-    // Mở Modal Thêm Nhanh (truyền loại: 'mau-sac' | 'cpu' | 'gpu | 'ram' | "rom"')
+
+    // Mở Modal Thêm Nhanh (truyền loại: 'mau-sac' | 'cpu' | 'gpu' | 'ram' | "rom")
     openQuickCreate(type) {
       if (this.$refs.quickCreateModal) {
         this.$refs.quickCreateModal.open(type);
@@ -437,7 +362,7 @@ export default {
     async handleQuickCreated({ type, data }) {
       await this.fetchDropdownData(); // Cập nhật lại toàn bộ danh sách select
 
-      const createdId = data?.id || data?._id;
+      const createdId = data?.data.id;
       if (!createdId) return;
 
       // Gán ID vừa tạo vào ô Select tương ứng

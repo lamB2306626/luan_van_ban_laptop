@@ -86,7 +86,12 @@ exports.findAll = async (req, res, next) => {
 // ============================== 3. Cập nhật Phiếu Giảm Giá theo mã ==================================
 exports.update = async (req, res, next) => {
   if (Object.keys(req.body).length === 0) {
-    return next(new ApiError(400, "Dữ liệu cập nhật không được để trống"));
+    return next(
+      new ApiError(
+        400,
+        "Dữ liệu cập nhật không được để trống không được để trống",
+      ),
+    );
   }
 
   if (req.body.ngay_bat_dau && req.body.ngay_het_han) {

@@ -21,6 +21,7 @@ exports.create = async (req, res, next) => {
       data: document,
     });
   } catch (error) {
+    console.error("LỖI: ", error);
     if (error.message === "NGAY_KET_THUC_PHAI_LON_HON_NGAY_BAT_DAU") {
       return next(new ApiError(400, "Ngày kết thúc phải lớn hơn ngày bắt đầu"));
     }
@@ -72,7 +73,12 @@ exports.findAll = async (req, res, next) => {
 // ============================== 3. Cập nhật Đợt Khuyến Mãi theo mã ==================================
 exports.update = async (req, res, next) => {
   if (Object.keys(req.body).length === 0) {
-    return next(new ApiError(400, "Dữ liệu cập nhật không được để trống"));
+    return next(
+      new ApiError(
+        400,
+        "Dữ liệu cập nhật không được để trống không được để trống",
+      ),
+    );
   }
 
   try {

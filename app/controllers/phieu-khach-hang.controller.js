@@ -62,11 +62,23 @@ exports.findAll = async (req, res, next) => {
       trangThaiFilter = req.query.trang_thai === "true";
     }
 
+    let trangThaiKhoaFilter;
+    if (req.query.trang_thai_khoa !== undefined) {
+      trangThaiKhoaFilter = req.query.trang_thai_khoa === "true";
+    }
+
+    let khaDungFilter;
+    if (req.query.kha_dung !== undefined) {
+      khaDungFilter = req.query.kha_dung === "true";
+    }
+
     const filterData = {
       id: req.query.id, // Lọc theo mã (?id=PKH01)
       id_khach_hang: req.query.id_khach_hang, // Lọc theo khách hàng (?id_khach_hang=KH01)
       id_phieu_giam_gia: req.query.id_phieu_giam_gia, // Lọc theo phiếu (?id_phieu_giam_gia=PGG01)
       trang_thai: trangThaiFilter, // Lọc phiếu chưa dùng/đã dùng (?trang_thai=true)
+      kha_dung: khaDungFilter,
+      trang_thai_khoa: trangThaiKhoaFilter,
     };
 
     const documents = await service.find(filterData);
@@ -102,7 +114,12 @@ exports.findOne = async (req, res, next) => {
 // ============================== 4. Cập nhật Phiếu Khách Hàng ==================================
 exports.update = async (req, res, next) => {
   if (Object.keys(req.body).length === 0) {
-    return next(new ApiError(400, "Dữ liệu cập nhật không được để trống"));
+    return next(
+      new ApiError(
+        400,
+        "Dữ liệu cập nhật không được để trống không được để trống",
+      ),
+    );
   }
 
   try {
@@ -170,6 +187,63 @@ exports.deleteAll = async (req, res, next) => {
       new ApiError(
         500,
         "Đã xảy ra lỗi trong quá trình dọn dẹp danh sách phiếu khách hàng",
+      ),
+    );
+  }
+};
+
+// ============================== 7. Admin Tặng Phiếu Giảm Giá Kèm ==================================
+exports.tangPhieuByAdmin = async (req, res, next) => {
+  if (!req.body?.id_phieu_giam_gia) {
+    return next(new ApiError(400, "id_phieu_giam_gia không được để trống"));
+  }
+
+  // Kiểm tra phải có id_khach_hang HOẶC danh_sach_id_khach_hang
+  const hasSingleCustomer = !!req.body?.id_khach_hang;
+  const hasMultipleCustomers =
+    Array.isArray(req.body?.danh_sach_id_khach_hang) &&
+    req.body.danh_sach_id_khach_hang.length > 0;
+
+  if (!hasSingleCustomer && !hasMultipleCustomers) {
+    return next(
+      new ApiError(
+        400,
+        "Vui lòng cung cấp id_khach_hang hoặc danh_sach_id_khach_hang để tặng phiếu",
+      ),
+    );
+  }
+
+  try {
+    const service = new PhieuKhachHangService();
+    // Gọi hàm tangPhieuByAdmin thay vì create thông thường
+    const result = await service.tangPhieuByAdmin(req.body);
+
+    let message =
+      "Tặng phiếu giảm giá và gửi thông báo cho khách hàng thành công";
+
+    if (result && result.totalCreated !== undefined) {
+      message = `Đã tặng thành công phiếu giảm giá và phát thông báo cho ${result.totalCreated} khách hàng`;
+    }
+
+    return res.status(201).send({
+      message: message,
+      data: result,
+    });
+  } catch (error) {
+    if (error.message === "KHACH_HANG_HOAC_PHIEU_GIAM_GIA_KHONG_TON_TAI") {
+      return next(
+        new ApiError(
+          404,
+          "Khách hàng hoặc Phiếu giảm giá không tồn tại trong hệ thống",
+        ),
+      );
+    }
+
+    console.error("Lỗi khi Admin tặng phiếu:", error);
+    return next(
+      new ApiError(
+        500,
+        "Đã xảy ra lỗi khi thực hiện tặng phiếu giảm giá cho khách hàng",
       ),
     );
   }

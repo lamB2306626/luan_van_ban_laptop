@@ -36,6 +36,52 @@
 
     <!-- ================= CHẾ ĐỘ 2: PHỄU LỌC 2 BƯỚC ================= -->
     <div v-else>
+      <button
+        :disabled="
+          !selectedCategoryId && !selectedBrandId && !selectedProductId
+        "
+        class="btn btn-outline-secondary"
+        type="button"
+        @click="resetFilters"
+      >
+        Xóa bộ lọc
+      </button>
+
+      <!-- 🌟 THÊM 2 Ô LỌC DANH MỤC VÀ THƯƠNG HIỆU Ở ĐÂY -->
+      <div class="row g-2 mb-3">
+        <!-- Chọn Danh mục -->
+        <div class="col-md-6">
+          <label class="form-label small fw-bold text-secondary mb-1"
+            >Danh mục</label
+          >
+          <BaseSearchSelect
+            v-model="selectedCategoryId"
+            :options="dsDanhMuc"
+            label-key="ten_danh_muc"
+            value-key="id"
+            placeholder="Gõ tên hoặc mã danh mục..."
+            :disabled="disabled"
+            @update:model-value="onCategoryChange"
+          />
+        </div>
+
+        <!-- Chọn Thương hiệu -->
+        <div class="col-md-6">
+          <label class="form-label small fw-bold text-secondary mb-1"
+            >Thương hiệu</label
+          >
+          <BaseSearchSelect
+            v-model="selectedBrandId"
+            :options="dsThuongHieu"
+            label-key="ten_thuong_hieu"
+            value-key="id"
+            placeholder="Gõ tên hoặc mã thương hiệu..."
+            :disabled="disabled"
+            @update:model-value="onBrandChange"
+          />
+        </div>
+      </div>
+
       <!-- BƯỚC 1: CHỌN SẢN PHẨM MẸ -->
       <div class="mb-3">
         <label class="form-label small fw-bold text-secondary">
@@ -56,97 +102,81 @@
       <label class="form-label small fw-bold text-secondary mb-2">
         Bước 2: Chọn thông số kỹ thuật
       </label>
-        <div class="row g-2">
-          <!-- Màu sắc -->
-          <div class="col-md-4 col-6">
-            <select
-              class="form-select form-control form-select-sm"
-              v-model="filterConfig.id_mau_sac"
-              :disabled="!selectedProductId || disabled"
+      <div class="row g-2">
+        <!-- Màu sắc -->
+        <div class="col-md-4 col-6">
+          <select
+            class="form-select form-control form-select-sm"
+            v-model="filterConfig.id_mau_sac"
+            :disabled="!selectedProductId || disabled"
+          >
+            <option value="">-- Tất cả Màu --</option>
+            <option
+              v-for="opt in availableColors"
+              :key="opt.id"
+              :value="opt.id"
             >
-              <option value="">-- Tất cả Màu --</option>
-              <option
-                v-for="opt in availableColors"
-                :key="opt.id"
-                :value="opt.id"
-              >
-                {{ opt.ten_mau_sac }}
-              </option>
-            </select>
-          </div>
-
-          <!-- CPU -->
-          <div class="col-md-4 col-6">
-            <select
-              class="form-select form-control form-select-sm"
-              v-model="filterConfig.id_cpu"
-              :disabled="!selectedProductId || disabled"
-            >
-              <option value="">-- Tất cả CPU --</option>
-              <option
-                v-for="opt in availableCPUs"
-                :key="opt.id"
-                :value="opt.id"
-              >
-                {{ opt.ten_cpu }}
-              </option>
-            </select>
-          </div>
-
-          <!-- GPU -->
-          <div class="col-md-4 col-6">
-            <select
-              class="form-select form-control form-select-sm"
-              v-model="filterConfig.id_gpu"
-              :disabled="!selectedProductId || disabled"
-            >
-              <option value="">-- Tất cả GPU --</option>
-              <option
-                v-for="opt in availableGPUs"
-                :key="opt.id"
-                :value="opt.id"
-              >
-                {{ opt.ten_gpu }}
-              </option>
-            </select>
-          </div>
-
-          <!-- RAM -->
-          <div class="col-md-4 col-6">
-            <select
-              class="form-select form-control form-select-sm"
-              v-model="filterConfig.id_ram"
-              :disabled="!selectedProductId || disabled"
-            >
-              <option value="">-- Tất cả RAM --</option>
-              <option
-                v-for="opt in availableRAMs"
-                :key="opt.id"
-                :value="opt.id"
-              >
-                {{ opt.dung_luong_ram }}
-              </option>
-            </select>
-          </div>
-
-          <!-- ROM -->
-          <div class="col-md-4 col-6">
-            <select
-              class="form-select form-control form-select-sm"
-              v-model="filterConfig.id_rom"
-              :disabled="!selectedProductId || disabled"
-            >
-              <option value="">-- Tất cả ROM --</option>
-              <option
-                v-for="opt in availableROMs"
-                :key="opt.id"
-                :value="opt.id"
-              >
-                {{ opt.dung_luong_rom }}
-              </option>
-            </select>
-          </div>
+              {{ opt.ten_mau_sac }}
+            </option>
+          </select>
         </div>
+
+        <!-- CPU -->
+        <div class="col-md-4 col-6">
+          <select
+            class="form-select form-control form-select-sm"
+            v-model="filterConfig.id_cpu"
+            :disabled="!selectedProductId || disabled"
+          >
+            <option value="">-- Tất cả CPU --</option>
+            <option v-for="opt in availableCPUs" :key="opt.id" :value="opt.id">
+              {{ opt.ten_cpu }}
+            </option>
+          </select>
+        </div>
+
+        <!-- GPU -->
+        <div class="col-md-4 col-6">
+          <select
+            class="form-select form-control form-select-sm"
+            v-model="filterConfig.id_gpu"
+            :disabled="!selectedProductId || disabled"
+          >
+            <option value="">-- Tất cả GPU --</option>
+            <option v-for="opt in availableGPUs" :key="opt.id" :value="opt.id">
+              {{ opt.ten_gpu }}
+            </option>
+          </select>
+        </div>
+
+        <!-- RAM -->
+        <div class="col-md-4 col-6">
+          <select
+            class="form-select form-control form-select-sm"
+            v-model="filterConfig.id_ram"
+            :disabled="!selectedProductId || disabled"
+          >
+            <option value="">-- Tất cả RAM --</option>
+            <option v-for="opt in availableRAMs" :key="opt.id" :value="opt.id">
+              {{ opt.dung_luong_ram }}
+            </option>
+          </select>
+        </div>
+
+        <!-- ROM -->
+        <div class="col-md-4 col-6">
+          <select
+            class="form-select form-control form-select-sm"
+            v-model="filterConfig.id_rom"
+            :disabled="!selectedProductId || disabled"
+          >
+            <option value="">-- Tất cả ROM --</option>
+            <option v-for="opt in availableROMs" :key="opt.id" :value="opt.id">
+              {{ opt.dung_luong_rom }}
+            </option>
+          </select>
+        </div>
+      </div>
 
       <!-- KẾT QUẢ BIẾN THỂ LỌC ĐƯỢC -->
       <div v-if="selectedProductId" class="mt-3">
@@ -168,14 +198,32 @@
               type="button"
               v-for="bt in filteredVariants"
               :key="bt.id"
-              class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-2 px-3 small cursor-pointer"
-              :class="{ 'active fw-bold': modelValue === bt.id }"
+              class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-2 px-3 small"
+              :class="{
+                'active fw-bold': modelValue === bt.id,
+                // 1. Thêm class làm mờ và đổi con trỏ nếu biến thể này đã có trong phiếu nhập
+                'bg-light text-muted opacity-50 cursor-not-allowed':
+                  dsIdBienTheDaCo.includes(bt.id),
+              }"
+              :disabled="dsIdBienTheDaCo.includes(bt.id)"
               @click="onSelectVariant(bt.id)"
             >
               <div>
-                <span class="badge bg-secondary me-2">[{{ bt.id }}]</span>
+                <span class="badge bg-secondary text-white me-2"
+                  >[{{ bt.id }}]</span
+                >
                 <span>{{ formatVariantDetail(bt) }}</span>
+
+                <!-- 3. Hiển thị nhãn thông báo đã có trong phiếu nhập -->
+                <span
+                  v-if="dsIdBienTheDaCo.includes(bt.id)"
+                  class="badge bg-danger text-white ms-2"
+                  style="font-size: 10px"
+                >
+                  Đã có trong phiếu nhập
+                </span>
               </div>
+
               <i
                 v-if="modelValue === bt.id"
                 class="fas fa-check-circle text-white"
@@ -205,13 +253,28 @@ export default {
     modelValue: { type: String, default: "" },
     // Toàn bộ danh sách biến thể (chứa sẵn quan hệ Prisma)
     dsBienThe: { type: Array, default: () => [] },
+
+    // Toàn bộ danh sách danh mục và thương hiệu
+    dsDanhMuc: { type: Array, default: () => [] },
+    dsThuongHieu: { type: Array, default: () => [] },
     disabled: { type: Boolean, default: false },
+
+    // Mảng ID sản phẩm đã tồn tại từ cha xuống để disable không cho chọn lại
+    // sản phẩm đã có trong phiếu nhập này trong form thêm mới
+    dsIdBienTheDaCo: {
+      type: Array,
+      default: () => [],
+    },
+
+    selectedSupplierId: { type: String, default: "" }, // id nhà cung cấp của phiếu nhập hiện tại
   },
   emits: ["update:modelValue"],
   data() {
     return {
       isQuickSearch: false,
       selectedProductId: "",
+      selectedCategoryId: "",
+      selectedBrandId: "",
       filterConfig: {
         id_mau_sac: "",
         id_cpu: "",
@@ -225,16 +288,49 @@ export default {
     // 1. Tự động trích xuất danh sách Sản Phẩm Mẹ từ dsBienThe
     dsSanPham() {
       const mapSp = new Map();
+
       this.dsBienThe.forEach((bt) => {
-        if (bt.san_pham && !mapSp.has(bt.id_san_pham)) {
-          mapSp.set(bt.id_san_pham, bt.san_pham);
-        } else if (!bt.san_pham && !mapSp.has(bt.id_san_pham)) {
-          mapSp.set(bt.id_san_pham, {
-            id: bt.id_san_pham,
-            ten_san_pham: `Sản phẩm ${bt.id_san_pham}`,
-          });
+        const sp = bt.san_pham;
+        const spId = bt.id_san_pham;
+
+        if (!sp || mapSp.has(spId)) return;
+
+        // Lọc theo Danh mục đã chọn
+        if (
+          this.selectedCategoryId &&
+          String(sp.id_danh_muc) !== String(this.selectedCategoryId)
+        ) {
+          return;
         }
+        // Lọc theo Thương hiệu đã chọn
+        if (
+          this.selectedBrandId &&
+          String(sp.id_thuong_hieu) !== String(this.selectedBrandId)
+        ) {
+          return;
+        }
+
+        // Kiểm tra xem sản phẩm này có chứa NCC đang chọn hay không (Logic cũ của bạn)
+        let isBelongToSupplier = true;
+        if (this.selectedSupplierId && sp?.nha_cung_cap_san_pham) {
+          isBelongToSupplier = sp.nha_cung_cap_san_pham.some(
+            (ncc) => String(ncc.id_nha_cc) === String(this.selectedSupplierId),
+          );
+        }
+
+        const tenGoc = sp?.ten_san_pham || `Sản phẩm ${spId}`;
+
+        mapSp.set(spId, {
+          ...sp,
+          id: spId,
+          ten_san_pham: tenGoc,
+          label_display: isBelongToSupplier
+            ? tenGoc
+            : `${tenGoc} ❌ (Khác NCC)`,
+          is_disabled: !isBelongToSupplier,
+        });
       });
+
       return Array.from(mapSp.values());
     },
 
@@ -324,12 +420,45 @@ export default {
       this.isQuickSearch = !this.isQuickSearch;
     },
 
+    // Khi đổi Danh mục: reset lại Thương hiệu và Sản phẩm đã chọn để tránh lệch dữ liệu
+    onCategoryChange() {
+      // this.selectedBrandId = "";
+      this.selectedProductId = "";
+      this.resetFilterConfig();
+      this.onSelectVariant("");
+    },
+
+    // Khi đổi Thương hiệu: reset lại Sản phẩm đã chọn
+    onBrandChange() {
+      this.selectedProductId = "";
+      this.resetFilterConfig();
+      this.onSelectVariant("");
+    },
+
     onProductChange() {
+      // 🌟 Khi chọn thẳng sản phẩm, tự động đồng bộ (auto-fill) ngược lại Danh mục và Thương hiệu của sản phẩm đó lên trên
+      if (this.selectedProductId) {
+        const selectedSp = this.dsSanPham.find(
+          (sp) => sp.id === this.selectedProductId,
+        );
+        if (selectedSp) {
+          if (selectedSp.id_danh_muc)
+            this.selectedCategoryId = selectedSp.id_danh_muc;
+          if (selectedSp.id_thuong_hieu)
+            this.selectedBrandId = selectedSp.id_thuong_hieu;
+        }
+      }
+
       this.resetFilterConfig();
       this.onSelectVariant("");
     },
 
     onSelectVariant(variantId) {
+      // Nếu biến thể này đã nằm trong danh sách đã có của phiếu nhập thì chặn luôn không cho chọn (đề phòng)
+      if (this.dsIdBienTheDaCo.includes(variantId)) {
+        return;
+      }
+
       this.$emit("update:modelValue", variantId);
     },
 
@@ -371,6 +500,19 @@ export default {
       ].filter(Boolean);
 
       return parts.length > 0 ? parts.join(" - ") : "Mặc định";
+    },
+
+    resetFilters() {
+      this.selectedCategoryId = "";
+      this.selectedBrandId = "";
+      this.selectedProductId = "";
+      this.filterConfig = {
+        id_mau_sac: "",
+        id_cpu: "",
+        id_gpu: "",
+        id_ram: "",
+        id_rom: "",
+      };
     },
   },
 };

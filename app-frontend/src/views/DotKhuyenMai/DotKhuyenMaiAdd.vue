@@ -1,10 +1,11 @@
 <template>
-  <div class="container mt-3 col-md-6">
+  <div class="container mt-3">
     <h4>Thêm Mới Đợt Khuyến Mãi</h4>
 
     <DotKhuyenMaiForm
       :dotKhuyenMai="dotKhuyenMaiData"
       :isEdit="false"
+      canManageDotKhuyenMai="true"
       @submit:dotKhuyenMai="addDotKhuyenMai"
       @cancel="returnView"
     />
@@ -32,6 +33,7 @@ export default {
       message: "",
     };
   },
+
   methods: {
     async addDotKhuyenMai(data) {
       try {

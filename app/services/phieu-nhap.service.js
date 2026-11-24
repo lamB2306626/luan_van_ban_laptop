@@ -1,12 +1,15 @@
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+const prisma = require("../utils/prisma");
+const ChiTietPhieuService = require("./chi-tiet-phieu-nhap.service");
 
 class PhieuNhapService {
+  constructor() {
+    this.chiTietPhieuNhapService = new ChiTietPhieuService();
+  }
   // Lọc lấy các trường thuộc tính hợp lệ
   extractPhieuNhapData(payload) {
     const phieuNhap = {
       id: payload.id,
-      // id_ncc: payload.id_ncc,
+      id_ncc: payload.id_ncc,
       id_nhan_vien: payload.id_nhan_vien,
       tong_tien:
         payload.tong_tien !== undefined ? Number(payload.tong_tien) : undefined,
@@ -20,39 +23,65 @@ class PhieuNhapService {
 
   // 1. Tạo Phiếu Nhập mới (Tự sinh mã PN01, PN02 nếu client không truyền id)
   async create(payload) {
-    if (!payload.id) {
-      // Tìm 1 Phiếu Nhập có ID lớn nhất hiện tại
-      const lastPhieuNhap = await prisma.phieu_nhap.findFirst({
-        orderBy: {
-          id: "desc", // Sắp xếp ID giảm dần (ví dụ: PN05, PN04, PN03...)
-        },
-      });
-
-      if (!lastPhieuNhap) {
-        // Nếu database chưa có Phiếu Nhập nào
-        payload.id = "PN01";
-      } else {
-        // Lấy phần số ra khỏi chuỗi (VD: "PN05" -> lấy số 5)
-        const currentNumber =
-          parseInt(lastPhieuNhap.id.replace(/\D/g, ""), 10) || 0;
-        // Cộng thêm 1 và format lại thành chuỗi PN06
-        payload.id = `PN${String(currentNumber + 1).padStart(2, "0")}`;
-      }
-    }
-
-    const data = this.extractPhieuNhapData(payload);
     try {
-      return await prisma.phieu_nhap.create({
-        data: data,
-        include: {
-          // nha_cung_cap: true,
-          nhan_vien: true,
-        },
+      // Sử dụng $transaction để đảm bảo tính toàn vẹn dữ liệu (Rollback nếu xảy ra lỗi)
+      const result = await prisma.$transaction(async (tx) => {
+        // 1.1. Tự sinh mã Phiếu Nhập (PN01, PN02...) nếu chưa có ID
+        if (!payload.id) {
+          const lastPhieuNhap = await tx.phieu_nhap.findFirst({
+            orderBy: {
+              id: "desc",
+            },
+          });
+
+          if (!lastPhieuNhap) {
+            payload.id = "PN0001";
+          } else {
+            const currentNumber =
+              parseInt(lastPhieuNhap.id.replace(/\D/g, ""), 10) || 0;
+            payload.id = `PN${String(currentNumber + 1).padStart(4, "0")}`;
+          }
+        }
+
+        // Trích xuất dữ liệu của bảng phieu_nhap
+        const dataPhieuNhap = this.extractPhieuNhapData(payload);
+
+        // 1.2. Tạo bản ghi Phiếu Nhập
+        const newPhieuNhap = await tx.phieu_nhap.create({
+          data: {
+            ...dataPhieuNhap,
+            id: payload.id, // Đảm bảo gán ID vừa tự sinh
+          },
+          include: {
+            nhan_vien: true,
+          },
+        });
+
+        // 1.3. Thêm danh sách Chi Tiết Phiếu Nhập (nếu có gửi kèm)
+        const dsChiTiet = payload.ds_chi_tiet;
+
+        if (Array.isArray(dsChiTiet) && dsChiTiet.length > 0) {
+          // Gán id_phieu_nhap cho từng dòng chi tiết
+          const preparedChiTiet = dsChiTiet.map((ct) => ({
+            ...ct,
+            id_phieu_nhap: newPhieuNhap.id,
+          }));
+
+          await this.chiTietPhieuNhapService.create(preparedChiTiet, tx);
+        }
+
+        return newPhieuNhap;
       });
+
+      return result;
     } catch (error) {
-      // Mã P2003: Lỗi vi phạm khóa ngoại (id_ncc hoặc id_nhan_vien không tồn tại)
+      // Mã P2003: Lỗi vi phạm khóa ngoại (id_ncc, id_nhan_vien hoặc id_bien_the không tồn tại)
       if (error.code === "P2003") {
         throw new Error("KHOA_NGOAI_KHONG_TON_TAI");
+      }
+      // Mã P2002: Trùng khóa chính ID phiếu nhập
+      if (error.code === "P2002") {
+        throw new Error("MA_PHIEU_NHAP_DA_TON_TAI");
       }
       throw error;
     }
@@ -68,14 +97,14 @@ class PhieuNhapService {
     }
 
     // Tìm kiếm theo mã nhà cung cấp
-    // if (filterData.id_ncc) {
-    //   where.id_ncc = filterData.id_ncc;
-    // }
+    if (filterData.id_ncc) {
+      where.id_ncc = filterData.id_ncc;
+    }
 
     // Tìm kiếm theo mã nhân viên lập phiếu
-    // if (filterData.id_nhan_vien) {
-    //   where.id_nhan_vien = filterData.id_nhan_vien;
-    // }
+    if (filterData.id_nhan_vien) {
+      where.id_nhan_vien = filterData.id_nhan_vien;
+    }
 
     if (filterData.tu_ngay || filterData.den_ngay) {
       // Tìm các phiếu có ngày bắt đầu nằm trong khoảng được chọn
@@ -89,7 +118,7 @@ class PhieuNhapService {
     return await prisma.phieu_nhap.findMany({
       where: where,
       include: {
-        // nha_cung_cap: true,
+        nha_cung_cap: true,
         nhan_vien: true,
       },
     });
@@ -106,7 +135,7 @@ class PhieuNhapService {
         where: { id: id },
         data: updateData,
         include: {
-          // nha_cung_cap: true,
+          nha_cung_cap: true,
           nhan_vien: true,
         },
       });
@@ -155,7 +184,7 @@ class PhieuNhapService {
     return await prisma.phieu_nhap.findUnique({
       where: { id: id },
       include: {
-        // nha_cung_cap: true,
+        nha_cung_cap: true,
         nhan_vien: true,
       },
     });

@@ -1,8 +1,8 @@
 <template>
-  <div class="container mt-3 col-md-6">
+  <div class="container mt-3">
     <h4>Thêm Mới Sản Phẩm</h4>
 
-    <SanPhamForm
+    <SanPhamAllForm
       :sanPham="sanPhamData"
       :isEdit="false"
       @submit:sanPham="createSanPham"
@@ -13,13 +13,13 @@
 </template>
 
 <script>
-import SanPhamForm from "@/components/SanPham/SanPhamForm.vue";
+import SanPhamAllForm from "@/components/SanPham/SanPhamAllForm.vue";
 import SanPhamService from "@/services/san-pham.service";
 
 export default {
   name: "SanPhamAdd",
   components: {
-    SanPhamForm,
+    SanPhamAllForm,
   },
   data() {
     return {

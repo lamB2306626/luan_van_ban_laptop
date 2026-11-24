@@ -25,6 +25,7 @@ const nhanVienRouter = require("./app/routes/nhan-vien.route");
 const phieuNhapRouter = require("./app/routes/phieu-nhap.route");
 const chiTietPhieuNhapRouter = require("./app/routes/chi-tiet-phieu-nhap.route");
 const nhaCungCapRouter = require("./app/routes/nha-cung-cap.route");
+const nhaCungCapSanPhamRouter = require("./app/routes/nha-cung-cap-san-pham.route");
 const hangThanhVienRouter = require("./app/routes/hang-thanh-vien.route");
 const khachHangRouter = require("./app/routes/khach-hang.route");
 const diaChiRouter = require("./app/routes/dia-chi.route");
@@ -41,10 +42,23 @@ const gioHangRouter = require("./app/routes/gio-hang.route");
 const chiTietGioHangRouter = require("./app/routes/chi-tiet-gio-hang.route");
 const dotKhuyenMaiRouter = require("./app/routes/dot-khuyen-mai.route");
 const chiTietKhuyenMaiRouter = require("./app/routes/chi-tiet-khuyen-mai.route");
+const thanhToanRouter = require("./app/routes/thanh-toan.route");
+const ghnRouter = require("./app/routes/ghn.route");
+const lichSuTroTruyenRouter = require("./app/routes/lich-su-tro-truyen.route");
+const cuocTroTruyenRouter = require("./app/routes/cuoc-tro-truyen.route");
+const tinNhanRouter = require("./app/routes/tin-nhan.route");
+const lichSuXemRouter = require("./app/routes/lich-su-xem.route");
+const lichSuTimKiemRouter = require("./app/routes/lich-su-tim-kiem.route");
+const goiYRouter = require("./app/routes/goi-y.route");
+const chatbotRouter = require("./app/routes/chatbot.route");
+const phienChatAIRouter = require("./app/routes/phien-chat-ai.route");
+const thongKeRouter = require("./app/routes/thong-ke.route");
 
 const app = express();
 
 app.use("/uploads", express.static("uploads"));
+app.use("/public", express.static("public"));
+app.use("/images", express.static("images"));
 
 app.use(cors());
 app.use(express.json());
@@ -78,6 +92,7 @@ app.use("/api/nhan-vien", nhanVienRouter);
 app.use("/api/phieu-nhap", phieuNhapRouter);
 app.use("/api/chi-tiet-phieu-nhap", chiTietPhieuNhapRouter);
 app.use("/api/nha-cung-cap", nhaCungCapRouter);
+app.use("/api/nha-cung-cap-san-pham", nhaCungCapSanPhamRouter);
 app.use("/api/hang-thanh-vien", hangThanhVienRouter);
 app.use("/api/khach-hang", khachHangRouter);
 app.use("/api/dia-chi", diaChiRouter);
@@ -94,6 +109,17 @@ app.use("/api/gio-hang", gioHangRouter);
 app.use("/api/chi-tiet-gio-hang", chiTietGioHangRouter);
 app.use("/api/dot-khuyen-mai", dotKhuyenMaiRouter);
 app.use("/api/chi-tiet-khuyen-mai", chiTietKhuyenMaiRouter);
+app.use("/api/thanh-toan", thanhToanRouter);
+app.use("/api/ghn", ghnRouter);
+app.use("/api/lich-su-tro-truyen", lichSuTroTruyenRouter);
+app.use("/api/cuoc-tro-truyen", cuocTroTruyenRouter);
+app.use("/api/tin-nhan", tinNhanRouter);
+app.use("/api/lich-su-xem", lichSuXemRouter);
+app.use("/api/lich-su-tim-kiem", lichSuTimKiemRouter);
+app.use("/api/goi-y", goiYRouter);
+app.use("/api/chatbot", chatbotRouter);
+app.use("/api/phien-chat-ai", phienChatAIRouter);
+app.use("/api/thong-ke", thongKeRouter);
 
 // Middleware xử lý lỗi 404 (Không tìm thấy route)
 
@@ -108,5 +134,3 @@ app.use((err, req, res, next) => {
 });
 
 module.exports = app;
-
-

@@ -1,5 +1,4 @@
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+const prisma = require("../utils/prisma");
 const gioHangService = require("./gio-hang.service");
 const BienTheService = require("./bien-the.service");
 
@@ -34,11 +33,11 @@ class ChiTietGioHangService {
       });
 
       if (!lastChiTiet) {
-        payload.id = "CTGH01";
+        payload.id = "CTGH0001";
       } else {
         const currentNumber =
           parseInt(lastChiTiet.id.replace(/\D/g, ""), 10) || 0;
-        payload.id = `CTGH${String(currentNumber + 1).padStart(2, "0")}`;
+        payload.id = `CTGH${String(currentNumber + 1).padStart(4, "0")}`;
       }
     }
 
@@ -199,13 +198,24 @@ class ChiTietGioHangService {
   }
 
   // ==================== THÊM SẢN PHẨM VÀO GIỎ HÀNG ====================
-  async addToCart({ id_khach_hang, id_bien_the, so_luong = 1 }) {
+  async addToCart({
+    id_khach_hang,
+    id_bien_the,
+    so_luong = 1,
+    is_buy_now = false,
+  }) {
+    const MAX_QUANTITY_PER_ITEM = 3;
+
     const quantityToAdd = parseInt(so_luong, 10);
     if (isNaN(quantityToAdd) || quantityToAdd <= 0) {
       throw new Error("SO_LUONG_KHONG_HOP_LE");
     }
 
-    // 1. Kiểm tra sự tồn tại của biến thể sản phẩm
+    if (quantityToAdd > MAX_QUANTITY_PER_ITEM) {
+      throw new Error("VUOT_QUA_GIOI_HAN_TOI_DA_3_SAN_PHAM");
+    }
+
+    // 1. Kiểm tra tồn tại biến thể
     const bienThe = await prisma.bien_the.findUnique({
       where: { id: id_bien_the },
     });
@@ -214,7 +224,18 @@ class ChiTietGioHangService {
       throw new Error("BIEN_THE_KHONG_TON_TAI");
     }
 
-    // 2. Tìm giỏ hàng của khách hàng, nếu chưa có thì tự tạo mới
+    if (bienThe.so_luong <= 0) {
+      throw new Error("VUOT_QUA_SO_LUONG_TON_KHO");
+    }
+
+    // Mức trần thực tế được phép mua (nhỏ nhất giữa 3 và tồn kho)
+    const maxAllowed = Math.min(MAX_QUANTITY_PER_ITEM, bienThe.so_luong);
+
+    if (!is_buy_now && quantityToAdd > bienThe.so_luong) {
+      throw new Error("VUOT_QUA_SO_LUONG_TON_KHO");
+    }
+
+    // 2. Tìm hoặc tạo giỏ hàng
     let gioHang = await this.gioHangService.findByKhachHangId(id_khach_hang);
     if (!gioHang) {
       gioHang = await this.gioHangService.create({
@@ -222,12 +243,7 @@ class ChiTietGioHangService {
       });
     }
 
-    // 3. kiểm tra số lượng thêm vào giỏ hàng có lớn hơn số lượng trong kho không
-    if (quantityToAdd > bienThe.so_luong) {
-      throw new Error("VUOT_QUA_SO_LUONG_TON_KHO");
-    }
-
-    // 4. Kiểm tra xem biến thể đã có trong chi tiết giỏ hàng này chưa
+    // 3. Kiểm tra chi tiết giỏ hàng hiện tại
     const chiTietHienTai = await prisma.chi_tiet_gio_hang.findFirst({
       where: {
         id_gio_hang: gioHang.id,
@@ -236,22 +252,44 @@ class ChiTietGioHangService {
     });
 
     if (chiTietHienTai) {
-      // Nếu ĐÃ TỒN TẠI -> Kiểm tra tổng số lượng sau khi cộng dồn với tồn kho
-      const tongSoLuongMoi = chiTietHienTai.so_luong + quantityToAdd;
+      let tongSoLuongMoi = chiTietHienTai.so_luong + quantityToAdd;
 
-      if (tongSoLuongMoi > bienThe.so_luong) {
-        throw new Error("VUOT_QUA_SO_LUONG_TON_KHO");
+      if (is_buy_now) {
+        // NẾU LÀ MUA NGAY: Chạm trần thì tự động kẹp về mức tối đa (maxAllowed)
+        if (tongSoLuongMoi > maxAllowed) {
+          tongSoLuongMoi = maxAllowed;
+        }
+      } else {
+        // NẾU THÊM GIỎ BÌNH THƯỜNG: Vượt trần thì báo lỗi như cũ
+        if (tongSoLuongMoi > MAX_QUANTITY_PER_ITEM) {
+          const err = new Error(
+            "SAU_KHI_THEM_VUOT_QUA_GIOI_HAN_TOI_DA_3_SAN_PHAM",
+          );
+          err.currentInCart = chiTietHienTai.so_luong;
+          throw err;
+        }
+
+        if (tongSoLuongMoi > bienThe.so_luong) {
+          const err = new Error("SAU_KHI_THEM_VUOT_QUA_SO_LUONG_TON_KHO");
+          err.currentInCart = chiTietHienTai.so_luong;
+          err.stockAvailable = bienThe.so_luong;
+          throw err;
+        }
       }
 
       return await this.update(chiTietHienTai.id, {
         so_luong: tongSoLuongMoi,
       });
     } else {
-      // Nếu chưa TỒN TẠI -> Tạo mới bản ghi chi tiết giỏ hàng
+      // Nếu chưa có trong giỏ: Với Mua ngay thì cũng kẹp sẵn nếu quantityToAdd > maxAllowed
+      const finalQuantity = is_buy_now
+        ? Math.min(quantityToAdd, maxAllowed)
+        : quantityToAdd;
+
       return await this.create({
         id_gio_hang: gioHang.id,
         id_bien_the: id_bien_the,
-        so_luong: quantityToAdd,
+        so_luong: finalQuantity,
       });
     }
   }

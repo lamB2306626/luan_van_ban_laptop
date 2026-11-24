@@ -49,7 +49,12 @@ exports.findAll = async (req, res, next) => {
 // ============================== 3. Cập nhật Giỏ Hàng theo mã id ==================================
 exports.update = async (req, res, next) => {
   if (Object.keys(req.body).length === 0) {
-    return next(new ApiError(400, "Dữ liệu cập nhật không được để trống"));
+    return next(
+      new ApiError(
+        400,
+        "Dữ liệu cập nhật không được để trống không được để trống",
+      ),
+    );
   }
 
   try {
@@ -123,21 +128,38 @@ exports.findOne = async (req, res, next) => {
 };
 
 // ============================== 7. Tìm Giỏ Hàng theo id_khach_hang ==================================
-exports.findByKhachHang = async (req, res, next) => {
+// exports.findByKhachHang = async (req, res, next) => {
+//   try {
+//     const service = new GioHangService();
+//     const document = await service.findByKhachHangId(req.params.idKhachHang);
+
+//     if (!document) {
+//       return next(new ApiError(404, "Khách hàng này chưa có giỏ hàng"));
+//     }
+
+//     return res.send(document);
+//   } catch (error) {
+//     return next(
+//       new ApiError(
+//         500,
+//         `Lỗi khi lấy giỏ hàng của khách hàng = ${req.params.idKhachHang}`,
+//       ),
+//     );
+//   }
+// };
+
+// ============================== 8. Đếm số sản phẩm trong Giỏ Hàng theo id_khach_hang ==================================
+exports.countByKhachHangId = async (req, res, next) => {
   try {
     const service = new GioHangService();
-    const document = await service.findByKhachHangId(req.params.idKhachHang);
-
-    if (!document) {
-      return next(new ApiError(404, "Khách hàng này chưa có giỏ hàng"));
-    }
+    const document = await service.countByKhachHangId(req.params.id_khach_hang);
 
     return res.send(document);
   } catch (error) {
     return next(
       new ApiError(
         500,
-        `Lỗi khi lấy giỏ hàng của khách hàng = ${req.params.idKhachHang}`,
+        `Lỗi khi lấy số lượng sản phẩm trong giỏ hàng của khách hàng = ${req.params.id_khach_hang}`,
       ),
     );
   }

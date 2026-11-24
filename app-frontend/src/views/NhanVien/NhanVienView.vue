@@ -11,7 +11,7 @@
     </div>
 
     <!-- Component Tìm Kiếm -->
-    <NhanVienSearch v-model="searchParams" @submit="fetchNhanVienList" />
+    <NhanVienSearch v-model="searchParams" @submit="retrievenhanViens" />
 
     <!-- Thông báo Alert (Nếu có) -->
     <div
@@ -84,12 +84,19 @@
               <i class="fas fa-user-edit"></i> Cập nhật
             </button>
 
+            <!-- Nút Khóa / Mở khóa tài khoản -->
             <button
-              class="btn btn-sm btn-danger me-2"
-              title="Xóa nhân viên"
-              @click="handleDeleteNhanVien(nv)"
+              class="btn btn-sm"
+              :class="nv.trang_thai ? 'btn-warning' : 'btn-success'"
+              @click="toggleStatusnhanVien(nv)"
+              :title="nv.trang_thai ? 'Khóa tài khoản' : 'Mở khóa tài khoản'"
             >
-              <i class="fas fa-user-minus"></i> Xóa
+              <i
+                :class="
+                  nv.trang_thai ? 'fas fa-user-lock' : 'fas fa-user-check'
+                "
+              ></i>
+              {{ nv.trang_thai ? " Khóa" : " Mở khóa" }}
             </button>
           </td>
         </tr>
@@ -120,7 +127,7 @@ export default {
   },
   methods: {
     // Lấy danh sách nhân viên kết hợp bộ lọc searchParams
-    async fetchNhanVienList() {
+    async retrievenhanViens() {
       try {
         if (NhanVienService) {
           this.dsNhanVien = await NhanVienService.getAll(this.searchParams);
@@ -141,26 +148,41 @@ export default {
       this.$router.push({ name: "nhan-vien.edit", params: { id } });
     },
 
-    // Xử lý Xóa nhân viên
-    async handleDeleteNhanVien(nv) {
+    // ==================== 2. Khóa (Delete) / Mở khóa (Restore) Tài Khoản Nhân Viên ====================
+    async toggleStatusnhanVien(nhanVien) {
+      const isLocking = nhanVien.trang_thai;
+      const actionText = isLocking ? "KHÓA" : "MỞ KHÓA";
+
       if (
-        confirm(`Bạn có chắc chắn muốn xóa nhân viên "${nv.ho_ten}" không?`)
+        confirm(
+          `Bạn có chắc chắn muốn ${actionText} tài khoản của nhân viên "${nhanVien.ho_ten}" không?`,
+        )
       ) {
         try {
-          await NhanVienService.delete(nv.id);
-          this.message = `Đã xóa thành công nhân viên ${nv.ho_ten}.`;
-          await this.fetchNhanVienList(); // Tải lại danh sách
+          if (isLocking) {
+            // Nếu tài khoản đang hoạt động -> Gọi hàm delete để Khóa tài khoản
+            await NhanVienService.delete(nhanVien.id);
+          } else {
+            // Nếu tài khoản đang bị khóa -> Gọi hàm restore để Khôi phục/Mở khóa tài khoản
+            await NhanVienService.restore(nhanVien.id);
+          }
+
+          alert(`${actionText} tài khoản thành công!`);
+          this.retrievenhanViens();
         } catch (error) {
-          console.error("Lỗi khi xóa nhân viên:", error);
-          this.message =
+          console.error(error);
+          const errorMessage =
             error.response?.data?.message ||
-            "Xóa thất bại (Nhân viên này có thể đang ràng buộc với phiếu nhập/đơn hàng).";
+            error.response?.data ||
+            `Có lỗi xảy ra khi ${actionText.toLowerCase()} tài khoản ${nhanVien.id}`;
+
+          alert(errorMessage);
         }
       }
     },
   },
   mounted() {
-    this.fetchNhanVienList();
+    this.retrievenhanViens();
   },
 };
 </script>

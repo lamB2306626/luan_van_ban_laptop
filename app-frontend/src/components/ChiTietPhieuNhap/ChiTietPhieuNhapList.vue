@@ -58,7 +58,9 @@
           <div class="modal-body">
             <ChiTietPhieuNhapForm
               v-if="showForm"
+              :dsIdBienTheDaCo="existingVariantIds"
               :chiTiet="selectedChiTiet"
+              :idNcc="phieuNhap.id_ncc"
               :isEdit="isEdit"
               @submit:chiTiet="handleSave"
               @cancel="closeModal"
@@ -74,6 +76,7 @@
 import ChiTietPhieuNhapTable from "./ChiTietPhieuNhapTable.vue";
 import ChiTietPhieuNhapForm from "./ChiTietPhieuNhapForm.vue";
 import ChiTietPhieuNhapService from "@/services/chi-tiet-phieu-nhap.service";
+import PhieuNhapService from "@/services/phieu-nhap.service";
 
 import { Modal } from "bootstrap";
 
@@ -89,12 +92,22 @@ export default {
   data() {
     return {
       dsChiTiet: [],
+      phieuNhap: [],
       selectedChiTiet: null,
       isEdit: false,
       showForm: false,
       message: "",
       modalInstance: null,
     };
+  },
+  computed: {
+    // Tự động quét mảng chi tiết hiện có để gom ra danh sách các ID sản phẩm đã có trong phiếu nhập này
+    // sau đó truyền vào form thêm mới chi tiết phiếu nhập để form này disable các sản phẩm đã chọn tránh chọn lại sản phẩm
+    existingVariantIds() {
+      if (!Array.isArray(this.dsChiTiet)) return [];
+      // Giả sử mỗi item trong dsChiTiet có chứa id_san_pham
+      return this.dsChiTiet.map((item) => item.id_bien_the);
+    },
   },
   methods: {
     // Lấy danh sách chi tiết phiếu nhập theo idPhieuNhap
@@ -104,6 +117,8 @@ export default {
           this.dsChiTiet = await ChiTietPhieuNhapService.getAll({
             id_phieu_nhap: this.idPhieuNhap,
           });
+
+          this.phieuNhap = await PhieuNhapService.get(this.idPhieuNhap);
         }
       } catch (error) {
         console.error("Lỗi khi lấy danh sách chi tiết phiếu nhập:", error);

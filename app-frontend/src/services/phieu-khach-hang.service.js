@@ -20,6 +20,10 @@ class PhieuKhachHangService {
     return (await this.api.post("/", data)).data;
   }
 
+  async tangPhieuByAdmin(data) {
+    return (await this.api.post("/tang-phieu", data)).data;
+  }
+
   // 4. Cập nhật thông tin danh mục theo ID
   async update(id, data) {
     return (await this.api.put(`/${id}`, data)).data;

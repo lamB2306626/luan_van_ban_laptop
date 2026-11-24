@@ -3,6 +3,8 @@ const gioHang = require("../controllers/gio-hang.controller");
 
 const router = express.Router();
 
+router.route("/count/:id_khach_hang").get(gioHang.countByKhachHangId);
+
 router
   .route("/")
   .get(gioHang.findAll)

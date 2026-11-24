@@ -108,7 +108,12 @@ exports.findOne = async (req, res, next) => {
 // ============================== 4. Cập nhật Chi Tiết Thông Báo theo id ==================================
 exports.update = async (req, res, next) => {
   if (!req.body || Object.keys(req.body).length === 0) {
-    return next(new ApiError(400, "Dữ liệu cập nhật không được để trống"));
+    return next(
+      new ApiError(
+        400,
+        "Dữ liệu cập nhật không được để trống không được để trống",
+      ),
+    );
   }
 
   try {
@@ -175,6 +180,26 @@ exports.deleteAll = async (req, res, next) => {
     return next(
       new ApiError(500, "Đã xảy ra lỗi khi xóa tất cả chi tiết thông báo"),
     );
+  }
+};
+
+// ============================== 7. Đánh dấu 1 thông báo là ĐÃ ĐỌC ==================================
+exports.markOneAsRead = async (req, res, next) => {
+  const { id } = req.params;
+
+  if (!id) {
+    return next(new ApiError(400, "id không được để trống"));
+  }
+
+  try {
+    const service = new ChiTietThongBaoService();
+    await service.markOneAsRead(id);
+
+    return res.send({
+      message: `Đã đánh dấu thông báo là đã đọc`,
+    });
+  } catch (error) {
+    return next(new ApiError(500, `Lỗi khi đánh dấu đã đọc thông báo ${id}`));
   }
 };
 

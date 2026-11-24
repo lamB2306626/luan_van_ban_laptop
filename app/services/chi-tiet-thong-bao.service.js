@@ -1,5 +1,4 @@
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+const prisma = require("../utils/prisma");
 
 class ChiTietThongBaoService {
   // Lọc lấy các trường thuộc tính hợp lệ của Chi tiết thông báo
@@ -23,9 +22,9 @@ class ChiTietThongBaoService {
       orderBy: { id: "desc" },
     });
 
-    if (!lastRecord) return "CTTB01";
+    if (!lastRecord) return "CTTB0001";
     const currentNumber = parseInt(lastRecord.id.replace(/\D/g, ""), 10) || 0;
-    return `CTTB${String(currentNumber + 1).padStart(2, "0")}`;
+    return `CTTB${String(currentNumber + 1).padStart(4, "0")}`;
   }
 
   // ==================== 1. Phân phối Thông báo cho Khách hàng (Thêm mới chi tiết thông báo) ====================
@@ -51,7 +50,7 @@ class ChiTietThongBaoService {
       const records = payload.danh_sach_id_khach_hang.map((idKhachHang) => {
         startNum += 1;
         return {
-          id: `CTTB${String(startNum).padStart(2, "0")}`,
+          id: `CTTB${String(startNum).padStart(4, "0")}`,
           id_thong_bao: payload.id_thong_bao,
           id_khach_hang: idKhachHang,
         };
@@ -170,6 +169,17 @@ class ChiTietThongBaoService {
         khach_hang: true,
       },
     });
+  }
+
+  // ==================== 7. Đánh dấu 1 thông báo của Khách hàng là ĐÃ ĐỌC ====================
+  async markOneAsRead(id) {
+    const result = await prisma.chi_tiet_thong_bao.updateMany({
+      where: { id },
+      data: {
+        da_doc: true,
+      },
+    });
+    return result.count;
   }
 
   // ==================== 7. Đánh dấu tất cả thông báo của 1 Khách hàng là ĐÃ ĐỌC ====================

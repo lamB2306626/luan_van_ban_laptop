@@ -5,11 +5,19 @@
     <!-- Component Tìm kiếm Đợt Khuyến Mãi -->
     <SearchDotKhuyenMai v-model="filter" @submit="retrieveDotKhuyenMais" />
 
-    <button class="btn btn-primary mb-3" @click="goToAddDotKhuyenMai">
+    <button
+      class="btn btn-primary mb-3"
+      :class="{ 'btn-permission-muted': !canManageDotKhuyenMai }"
+      @click="goToAddDotKhuyenMai"
+    >
       <i class="fas fa-plus"></i> Thêm mới Đợt Khuyến Mãi
     </button>
 
-    <button class="btn btn-danger mb-3 ms-2" @click="deleteAllDotKhuyenMais">
+    <button
+      class="btn btn-danger mb-3 ms-2"
+      :class="{ 'btn-permission-muted': !canManageDotKhuyenMai }"
+      @click="deleteAllDotKhuyenMais"
+    >
       <i class="fas fa-trash"></i> Xóa tất cả Đợt Khuyến Mãi
     </button>
 
@@ -56,6 +64,7 @@
 
             <button
               class="btn btn-sm btn-danger"
+              :class="{ 'btn-permission-muted': !canManageDotKhuyenMai }"
               @click="deleteDotKhuyenMai(dotKM.id)"
             >
               <i class="fas fa-trash"></i> Xóa
@@ -78,6 +87,8 @@
 import SearchDotKhuyenMai from "@/components/DotKhuyenMai/DotKhuyenMaiSearch.vue";
 import DotKhuyenMaiService from "@/services/dot-khuyen-mai.service";
 
+const ALLOWED_DOT_KHUYEN_MAI_ROLES = ["Nhân viên Marketing", "Quản trị viên"];
+
 export default {
   name: "DotKhuyenMaiView",
   components: {
@@ -96,7 +107,39 @@ export default {
     };
   },
 
+  computed: {
+    currentAdminUser() {
+      try {
+        const userStr = localStorage.getItem("adminUser");
+        return userStr ? JSON.parse(userStr) : null;
+      } catch (e) {
+        return null;
+      }
+    },
+
+    adminRole() {
+      if (!this.currentAdminUser) return null;
+      return this.currentAdminUser.vai_tro.ten_vai_tro;
+    },
+
+    canManageDotKhuyenMai() {
+      return (
+        !!this.adminRole &&
+        ALLOWED_DOT_KHUYEN_MAI_ROLES.includes(this.adminRole)
+      );
+    },
+  },
+
   methods: {
+    // ==================== Phát tín hiệu không có quyền thực hiện thao tác ====================
+    notifyAccessDenied(message = "Bạn không có quyền thực hiện thao tác này!") {
+      window.dispatchEvent(
+        new CustomEvent("admin-access-denied", {
+          detail: { message },
+        }),
+      );
+    },
+
     // ==================== 1. Lấy danh sách Đợt Khuyến Mãi theo bộ lọc ====================
     async retrieveDotKhuyenMais() {
       try {
@@ -109,6 +152,10 @@ export default {
 
     // ==================== 2. Điều hướng tới Form Thêm Mới ====================
     goToAddDotKhuyenMai() {
+      if (!this.canManageDotKhuyenMai) {
+        this.notifyAccessDenied();
+        return;
+      }
       this.$router.push({ name: "dot-khuyen-mai.add" });
     },
 
@@ -122,6 +169,10 @@ export default {
 
     // ==================== 4. Xóa một Đợt Khuyến Mãi ====================
     async deleteDotKhuyenMai(id) {
+      if (!this.canManageDotKhuyenMai) {
+        this.notifyAccessDenied();
+        return;
+      }
       if (
         confirm(`Bạn có chắc chắn muốn xóa Đợt Khuyến Mãi có mã "${id}" không?`)
       ) {
@@ -143,6 +194,10 @@ export default {
 
     // ==================== 5. Xóa tất cả Đợt Khuyến Mãi ====================
     async deleteAllDotKhuyenMais() {
+      if (!this.canManageDotKhuyenMai) {
+        this.notifyAccessDenied();
+        return;
+      }
       const confirm1 = confirm(
         "CẢNH BÁO: Bạn có chắc chắn muốn xóa TẤT CẢ Đợt Khuyến Mãi không? Hành động này không thể hoàn tác!",
       );
@@ -191,3 +246,14 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+.btn-permission-muted {
+  opacity: 0.45;
+  cursor: pointer;
+}
+
+.btn-permission-muted:hover {
+  opacity: 0.65;
+}
+</style>

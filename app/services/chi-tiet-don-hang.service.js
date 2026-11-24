@@ -1,5 +1,4 @@
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+const prisma = require("../utils/prisma");
 const DonHangService = require("./don-hang.service");
 const BienTheService = require("./bien-the.service");
 
@@ -43,6 +42,12 @@ class ChiTietDonHangService {
       }
 
       const soLuongDat = Number(payload.so_luong) || 0;
+      const MAX_QUANTITY_PER_ITEM = 3;
+
+      if (soLuongDat > MAX_QUANTITY_PER_ITEM) {
+        throw new Error("VUOT_QUA_GIOI_HAN_TOI_DA_3_SAN_PHAM");
+      }
+
       if (soLuongDat > bienThe.so_luong) {
         throw new Error("SO_LUONG_TON_KHO_KHONG_DU");
       }
@@ -61,7 +66,7 @@ class ChiTietDonHangService {
           ? parseInt(lastRecord.id.replace(/\D/g, ""), 10) || 0
           : 0;
 
-        payload.id = `CTDH${String(currentNumber + 1).padStart(2, "0")}`;
+        payload.id = `CTDH${String(currentNumber + 1).padStart(4, "0")}`;
       }
 
       const data = this.extractChiTietDonHangData(payload);
@@ -190,6 +195,73 @@ class ChiTietDonHangService {
         bien_the: true,
       },
     });
+  }
+
+  // Lấy thống kê số lượt mua và tổng số lượng sản phẩm bán ra
+  async getThongKeLuotMua(idSanPhams) {
+    if (!idSanPhams || (Array.isArray(idSanPhams) && idSanPhams.length === 0)) {
+      return Array.isArray(idSanPhams)
+        ? new Map()
+        : { tong_so_luot_mua: 0, tong_so_luong_ban: 0 };
+    }
+
+    // Trường hợp 1: Truyền vào mảng các ID sản phẩm (dùng cho hàm find hoặc gợi ý)
+    if (Array.isArray(idSanPhams)) {
+      // Truy vấn tất cả chi tiết đơn hàng mà biến thể thuộc các sản phẩm trong mảng idSanPhams
+      const listChiTiet = await prisma.chi_tiet_don_hang.findMany({
+        where: {
+          bien_the: {
+            id_san_pham: { in: idSanPhams },
+          },
+        },
+        include: {
+          bien_the: {
+            select: { id_san_pham: true },
+          },
+        },
+      });
+
+      // Map lưu kết quả thống kê theo từng id_san_pham
+      const thongKeMap = new Map();
+
+      listChiTiet.forEach((item) => {
+        const idSanPham = item.bien_the?.id_san_pham;
+        if (!idSanPham) return;
+
+        if (!thongKeMap.has(idSanPham)) {
+          thongKeMap.set(idSanPham, {
+            tong_so_luot_mua: 0, // Số lần sản phẩm xuất hiện trong các chi tiết đơn hàng
+            tong_so_luong_ban: 0, // Tổng số lượng sản phẩm cộng dồn (so_luong)
+          });
+        }
+
+        const stats = thongKeMap.get(idSanPham);
+        stats.tong_so_luot_mua += 1;
+        stats.tong_so_luong_ban += item.so_luong || 0;
+      });
+
+      return thongKeMap;
+    }
+
+    // Trường hợp 2: Truyền vào 1 ID duy nhất (dùng cho trang chi tiết sản phẩm)
+    const listChiTietDon = await prisma.chi_tiet_don_hang.findMany({
+      where: {
+        bien_the: {
+          id_san_pham: idSanPhams,
+        },
+      },
+    });
+
+    const tong_so_luot_mua = listChiTietDon.length;
+    const tong_so_luong_ban = listChiTietDon.reduce(
+      (sum, item) => sum + (item.so_luong || 0),
+      0,
+    );
+
+    return {
+      tong_so_luot_mua: tong_so_luot_mua || 0,
+      tong_so_luong_ban: tong_so_luong_ban || 0,
+    };
   }
 }
 

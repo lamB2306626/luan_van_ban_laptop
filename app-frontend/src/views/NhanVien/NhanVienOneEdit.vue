@@ -58,9 +58,22 @@ export default {
         this.message = "Cập nhật nhân viên thành công!";
 
         // cập nhật lại localStorage
-        const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
-        const newUserInfo = { ...currentUser, ...data };
-        localStorage.setItem("user", JSON.stringify(newUserInfo));
+        const currentUser = JSON.parse(
+          localStorage.getItem("adminUser") || "{}",
+        );
+        if (currentUser && String(currentUser.id) === String(this.id)) {
+          // Lấy thông tin mới
+          const updatedUser = await NhanVienService.get(this.id);
+
+          if (updatedUser && updatedUser.id) {
+            // Giữ lại token/role nếu API get(id) không trả kèm các trường này
+            const mergedUser = {
+              ...currentUser,
+              ...updatedUser,
+            };
+            localStorage.setItem("adminUser", JSON.stringify(mergedUser));
+          }
+        }
 
         setTimeout(() => {
           this.goBack();
@@ -74,13 +87,13 @@ export default {
         this.message = errorMessage;
       }
     },
-    
+
     goBack() {
       if (window.history.length > 1) {
         this.$router.back();
       } else {
         // Trường hợp người dùng F5 trực tiếp hoặc dán URL vào trình duyệt, quay về trang mặc định
-        this.$router.push({ name: "danh-muc.home" });
+        this.$router.push({ name: "admin.home" });
       }
     },
   },

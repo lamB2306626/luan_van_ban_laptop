@@ -1,5 +1,4 @@
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+const prisma = require("../utils/prisma");
 
 class PhieuHangThanhVienService {
   // Lọc lấy các trường thuộc tính hợp lệ của Phiếu Hạng Thành Viên
@@ -28,12 +27,12 @@ class PhieuHangThanhVienService {
         });
 
       if (!lastPhieuHangThanhVien) {
-        payload.id = "PHTV01";
+        payload.id = "PHTV0001";
       } else {
         // Lấy phần số ra khỏi chuỗi (VD: "PHTV05" -> lấy số 5)
         const currentNumber =
           parseInt(lastPhieuHangThanhVien.id.replace(/\D/g, ""), 10) || 0;
-        payload.id = `PHTV${String(currentNumber + 1).padStart(2, "0")}`;
+        payload.id = `PHTV${String(currentNumber + 1).padStart(4, "0")}`;
       }
     }
 

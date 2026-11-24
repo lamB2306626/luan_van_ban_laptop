@@ -1,5 +1,4 @@
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+const prisma = require("../utils/prisma");
 
 class GioHangService {
   // Lọc lấy các trường thuộc tính hợp lệ của Giỏ Hàng
@@ -25,11 +24,11 @@ class GioHangService {
       });
 
       if (!lastGioHang) {
-        payload.id = "GH01";
+        payload.id = "GH0001";
       } else {
         const currentNumber =
           parseInt(lastGioHang.id.replace(/\D/g, ""), 10) || 0;
-        payload.id = `GH${String(currentNumber + 1).padStart(2, "0")}`;
+        payload.id = `GH${String(currentNumber + 1).padStart(4, "0")}`;
       }
     }
 
@@ -76,7 +75,6 @@ class GioHangService {
     });
 
     // 2. Với mỗi giỏ hàng, lấy danh sách chi tiết (thông qua ChiTietGioHangService)
-    // để lấy được các thông tin khuyến mãi hiện tại phục vụ cho việc hiển thị
     const ChiTietGioHangService = require("./chi-tiet-gio-hang.service");
     const chiTietGioHangService = new ChiTietGioHangService();
 
@@ -86,18 +84,26 @@ class GioHangService {
           id_gio_hang: gioHang.id,
         });
 
-        const tongTienGoc = chiTietList.reduce(
-          (sum, item) => sum + item.gia_goc * item.so_luong,
+        // Lọc danh sách sản phẩm hợp lệ (chỉ lấy các biến thể có trang_thai = true)
+        const chiTietHopLe = chiTietList.filter(
+          (item) => Boolean(item.bien_the?.trang_thai) === true,
+        );
+
+        // Tính tổng tiền dựa trên danh sách sản phẩm hợp lệ
+        const tongTienGoc = chiTietHopLe.reduce(
+          (sum, item) => sum + (Number(item.gia_goc) || 0) * item.so_luong,
           0,
         );
-        const tongThanhToan = chiTietList.reduce(
-          (sum, item) => sum + item.don_gia_ap_dung * item.so_luong,
+
+        const tongThanhToan = chiTietHopLe.reduce(
+          (sum, item) =>
+            sum + (Number(item.don_gia_ap_dung) || 0) * item.so_luong,
           0,
         );
 
         return {
           ...gioHang,
-          chi_tiet_gio_hang: chiTietList,
+          chi_tiet_gio_hang: chiTietList, // Vẫn trả về đủ danh sách để frontend hiển thị cảnh báo
           tong_tien_goc: tongTienGoc,
           tong_tien_giam: tongTienGoc - tongThanhToan,
           tong_thanh_toan: tongThanhToan,
@@ -171,6 +177,39 @@ class GioHangService {
         chi_tiet_gio_hang: true,
       },
     });
+  }
+
+  // 8. Đếm số lượng sản phẩm trong giỏ hàng theo ID Khách hàng
+  async countByKhachHangId(idKhachHang) {
+    // Tìm giỏ hàng của khách hàng
+    const gioHang = await prisma.gio_hang.findFirst({
+      where: { id_khach_hang: idKhachHang },
+      select: { id: true },
+    });
+
+    // Nếu khách chưa có giỏ hàng thì trả về 0
+    if (!gioHang) {
+      return {
+        tong_so_luong: 0,
+        so_mat_hang: 0,
+      };
+    }
+
+    // Dùng aggregate của Prisma để tính tổng so_luong và đếm số dòng biến thể
+    const result = await prisma.chi_tiet_gio_hang.aggregate({
+      where: { id_gio_hang: gioHang.id },
+      _sum: {
+        so_luong: true,
+      },
+      _count: {
+        id: true,
+      },
+    });
+
+    return {
+      tong_so_luong: result._sum.so_luong || 0, // Tổng tất cả sản phẩm (VD: 2 + 1 = 3)
+      so_mat_hang: result._count.id || 0, // Số loại biến thể khác nhau (VD: 2)
+    };
   }
 }
 

@@ -5,7 +5,9 @@
       <h4>
         <i class="fas fa-tags text-primary me-2"></i>
         Chi Tiết Đợt Khuyến Mãi:
-        <span class="text-primary">{{ dotKhuyenMai?.ten_dot || dotKhuyenMai?.id }}</span>
+        <span class="text-primary">{{
+          dotKhuyenMai?.ten_dot || dotKhuyenMai?.id
+        }}</span>
       </h4>
       <button class="btn btn-outline-secondary btn-sm" @click="goBack">
         <i class="fas fa-arrow-left me-1"></i> Quay lại danh sách
@@ -42,11 +44,12 @@
     <!-- Nội dung hiển thị theo từng Tab -->
     <div class="tab-content border rounded p-4 bg-white shadow-sm">
       <!-- TAB 1: THÔNG TIN ĐỢT KHUYẾN MÃI -->
-      <div v-if="activeTab === 'thong-tin-chung'">
+      <div v-show="activeTab === 'thong-tin-chung'">
         <!-- Chỉ render Form khi đã lấy xong dữ liệu dotKhuyenMai từ API -->
         <DotKhuyenMaiForm
           v-if="dotKhuyenMai"
           :dotKhuyenMai="dotKhuyenMai"
+          :canManageDotKhuyenMai="canManageDotKhuyenMai"
           :isEdit="true"
           @submit:dotKhuyenMai="handleUpdateDotKhuyenMai"
         />
@@ -61,9 +64,10 @@
       </div>
 
       <!-- TAB 2: QUẢN LÝ CHI TIẾT KHUYẾN MÃI -->
-      <div v-if="activeTab === 'quan-ly-chi-tiet'">
+      <div v-show="activeTab === 'quan-ly-chi-tiet'">
         <ChiTietKhuyenMaiList
           :idDotKm="id"
+          :canManageDotKhuyenMai="canManageDotKhuyenMai"
           @refreshDotKhuyenMai="getDotKhuyenMaiDetail"
         />
       </div>
@@ -75,6 +79,8 @@
 import DotKhuyenMaiForm from "@/components/DotKhuyenMai/DotKhuyenMaiForm.vue";
 import ChiTietKhuyenMaiList from "@/components/ChiTietKhuyenMai/ChiTietKhuyenMaiList.vue";
 import DotKhuyenMaiService from "@/services/dot-khuyen-mai.service";
+
+const ALLOWED_DOT_KHUYEN_MAI_ROLES = ["Nhân viên Marketing", "Quản trị viên"];
 
 export default {
   name: "DotKhuyenMaiDetailView",
@@ -92,6 +98,30 @@ export default {
       messageTab1: "", // Thông báo cho Tab 1
     };
   },
+
+  computed: {
+    currentAdminUser() {
+      try {
+        const userStr = localStorage.getItem("adminUser");
+        return userStr ? JSON.parse(userStr) : null;
+      } catch (e) {
+        return null;
+      }
+    },
+
+    adminRole() {
+      if (!this.currentAdminUser) return null;
+      return this.currentAdminUser.vai_tro.ten_vai_tro;
+    },
+
+    canManageDotKhuyenMai() {
+      return (
+        !!this.adminRole &&
+        ALLOWED_DOT_KHUYEN_MAI_ROLES.includes(this.adminRole)
+      );
+    },
+  },
+
   methods: {
     // Lấy thông tin chi tiết của Đợt Khuyến Mãi
     async getDotKhuyenMaiDetail() {

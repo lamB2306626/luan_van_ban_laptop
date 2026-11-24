@@ -44,14 +44,31 @@
       style="max-height: 200px; z-index: 1050"
     >
       <template v-if="filteredOptions.length > 0">
-        <li
-          v-for="item in filteredOptions"
-          :key="getItemValue(item)"
-          class="dropdown-item cursor-pointer"
-          @click="selectOption(item)"
-        >
-          [{{ getItemValue(item) }}] {{ getItemLabel(item) }}
-        </li>
+        <template v-if="filteredOptions.length > 0">
+          <li
+            v-for="item in filteredOptions"
+            :key="getItemValue(item)"
+            class="dropdown-item d-flex justify-content-between align-items-center"
+            :class="{
+              'disabled bg-light text-muted opacity-50': item.is_disabled,
+              'cursor-pointer': !item.is_disabled,
+            }"
+            :style="
+              item.is_disabled
+                ? 'pointer-events: none; cursor: not-allowed;'
+                : ''
+            "
+            @click="!item.is_disabled && selectOption(item)"
+          >
+            <!-- Nội dung chính: Mã + Tên sản phẩm -->
+            <div>[{{ getItemValue(item) }}] {{ getItemLabel(item) }}</div>
+
+            <!-- Badge cảnh báo nếu sản phẩm không thuộc NCC -->
+            <span v-if="item.is_disabled" class="badge bg-danger ms-2">
+              Khác NCC
+            </span>
+          </li>
+        </template>
       </template>
 
       <li v-else class="dropdown-item disabled text-muted text-center py-2">

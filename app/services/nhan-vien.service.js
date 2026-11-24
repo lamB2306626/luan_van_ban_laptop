@@ -1,5 +1,4 @@
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+const prisma = require("../utils/prisma");
 const bcrypt = require("bcrypt");
 
 class NhanVienService {
@@ -34,13 +33,13 @@ class NhanVienService {
 
       if (!lastNhanVien) {
         // Nếu database chưa có Nhân Viên nào
-        payload.id = "NV01";
+        payload.id = "NV0001";
       } else {
         // Lấy phần số ra khỏi chuỗi (VD: "NV05" -> lấy số 5)
         const currentNumber =
           parseInt(lastNhanVien.id.replace(/\D/g, ""), 10) || 0;
         // Cộng thêm 1 và format lại thành chuỗi NV06
-        payload.id = `NV${String(currentNumber + 1).padStart(2, "0")}`;
+        payload.id = `NV${String(currentNumber + 1).padStart(4, "0")}`;
       }
     }
 

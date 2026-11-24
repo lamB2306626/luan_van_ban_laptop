@@ -5,11 +5,19 @@
     <!-- Component Tìm kiếm Hạng thành viên -->
     <HangThanhVienSearch v-model="filter" @submit="retrieveHangThanhViens" />
 
-    <button class="btn btn-primary mb-3" @click="goToAddHangThanhVien">
+    <button
+      class="btn btn-primary mb-3"
+      :class="{ 'btn-permission-muted': !canManageHTV }"
+      @click="goToAddHangThanhVien"
+    >
       <i class="fas fa-plus"></i> Thêm mới Hạng Thành Viên
     </button>
 
-    <button class="btn btn-danger mb-3 ms-2" @click="deleteAllHangThanhViens">
+    <button
+      class="btn btn-danger mb-3 ms-2"
+      :class="{ 'btn-permission-muted': !canManageHTV }"
+      @click="deleteAllHangThanhViens"
+    >
       <i class="fas fa-trash"></i> Xóa tất cả Hạng Thành Viên
     </button>
 
@@ -43,7 +51,7 @@
                 class="badge bg-info text-dark"
               >
                 <i class="fas fa-ticket-alt me-1"></i>
-                {{ phtv.phieu_giam_gia?.ten_phieu}}
+                {{ phtv.phieu_giam_gia?.ten_phieu }}
               </span>
             </div>
             <span v-else class="text-muted fst-italic">Không có phiếu</span>
@@ -51,6 +59,7 @@
           <td>
             <button
               class="btn btn-sm btn-secondary me-2"
+              :class="{ 'btn-permission-muted': !canManageHTV }"
               @click="goToUpdateHangThanhVien(hang.id)"
             >
               <i class="fas fa-edit"></i> Cập nhật
@@ -58,6 +67,7 @@
 
             <button
               class="btn btn-sm btn-danger"
+              :class="{ 'btn-permission-muted': !canManageHTV }"
               @click="deleteHangThanhVien(hang.id)"
             >
               <i class="fas fa-trash"></i> Xóa
@@ -80,6 +90,8 @@
 import HangThanhVienSearch from "@/components/HangThanhVien/HangThanhVienSearch.vue";
 import HangThanhVienService from "@/services/hang-thanh-vien.service";
 
+const ALLOWED_HANG_THANH_VIEN_ROLES = ["Nhân viên Marketing", "Quản trị viên"];
+
 export default {
   name: "HangThanhVienView",
   components: {
@@ -95,7 +107,39 @@ export default {
     };
   },
 
+  computed: {
+    currentAdminUser() {
+      try {
+        const userStr = localStorage.getItem("adminUser");
+        return userStr ? JSON.parse(userStr) : null;
+      } catch (e) {
+        return null;
+      }
+    },
+
+    adminRole() {
+      if (!this.currentAdminUser) return null;
+      return this.currentAdminUser.vai_tro.ten_vai_tro;
+    },
+
+    canManageHTV() {
+      return (
+        !!this.adminRole &&
+        ALLOWED_HANG_THANH_VIEN_ROLES.includes(this.adminRole)
+      );
+    },
+  },
+
   methods: {
+    // ==================== Phát tín hiệu không có quyền thực hiện thao tác ====================
+    notifyAccessDenied(message = "Bạn không có quyền thực hiện thao tác này!") {
+      window.dispatchEvent(
+        new CustomEvent("admin-access-denied", {
+          detail: { message },
+        }),
+      );
+    },
+
     // Định dạng hiển thị mốc chi tiêu theo đơn vị VNĐ
     formatCurrency(value) {
       if (!value && value !== 0) return "0 đ";
@@ -117,11 +161,19 @@ export default {
 
     // ==================== 2. Điều hướng tới Form Thêm Mới ====================
     goToAddHangThanhVien() {
+      if (!this.canManageHTV) {
+        this.notifyAccessDenied();
+        return;
+      }
       this.$router.push({ name: "hang-thanh-vien.add" });
     },
 
     // ==================== 3. Điều hướng tới Form Cập Nhật ====================
     goToUpdateHangThanhVien(id) {
+      if (!this.canManageHTV) {
+        this.notifyAccessDenied();
+        return;
+      }
       this.$router.push({
         name: "hang-thanh-vien.edit",
         params: { id: id },
@@ -130,6 +182,10 @@ export default {
 
     // ==================== 4. Xóa một Hạng Thành Viên đơn lẻ ====================
     async deleteHangThanhVien(id) {
+      if (!this.canManageHTV) {
+        this.notifyAccessDenied();
+        return;
+      }
       if (
         confirm(
           `Bạn có chắc chắn muốn xóa Hạng Thành Viên có mã "${id}" không?`,
@@ -154,6 +210,10 @@ export default {
 
     // ==================== 5. Xóa tất cả Hạng Thành Viên ====================
     async deleteAllHangThanhViens() {
+      if (!this.canManageHTV) {
+        this.notifyAccessDenied();
+        return;
+      }
       const confirm1 = confirm(
         "CẢNH BÁO: Bạn có chắc chắn muốn xóa TẤT CẢ Hạng Thành Viên không? Hành động này không thể hoàn tác!",
       );
@@ -189,3 +249,14 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+.btn-permission-muted {
+  opacity: 0.45;
+  cursor: pointer;
+}
+
+.btn-permission-muted:hover {
+  opacity: 0.65;
+}
+</style>

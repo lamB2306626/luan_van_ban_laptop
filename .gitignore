@@ -141,3 +141,14 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+
+
+ai_rag_service/__pycache__/
+ai_rag_service/chroma_db/
+ai_rag_service/venv/
+app-frontend/node_modules/
+app-frontend/.env
+public/
+uploads/
+.env

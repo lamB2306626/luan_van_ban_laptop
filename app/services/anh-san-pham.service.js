@@ -1,5 +1,4 @@
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+const prisma = require("../utils/prisma");
 
 class AnhSanPhamService {
   // Lọc lấy các trường thuộc tính hợp lệ của anh_san_pham
@@ -17,31 +16,46 @@ class AnhSanPhamService {
   }
 
   // 1. Tạo Ảnh Sản Phẩm mới (Tự sinh mã ASP01, ASP02 nếu client không truyền id)
-  async create(payload, tx) {
+  // Tạo nhiều Ảnh Sản Phẩm cùng lúc (Giữ nguyên chuẩn ID: ASP01, ASP02...)
+  async create(payloads, tx) {
     const db = tx || prisma;
-    if (!payload.id) {
-      // Tìm 1 ảnh sản phẩm có ID lớn nhất hiện tại
-      const lastAnhSanPham = await db.anh_san_pham.findFirst({
-        orderBy: {
-          id: "desc", // Sắp xếp ID giảm dần (ví dụ: ASP05, ASP04...)
-        },
-      });
 
-      if (!lastAnhSanPham) {
-        payload.id = "ASP01";
-      } else {
-        const currentNumber =
-          parseInt(lastAnhSanPham.id.replace(/\D/g, ""), 10) || 0;
-        payload.id = `ASP${String(currentNumber + 1).padStart(2, "0")}`;
-      }
+    if (!Array.isArray(payloads) || payloads.length === 0) {
+      return [];
     }
 
-    const data = this.extractAnhSanPhamData(payload);
+    // 1. Chỉ tìm 1 ảnh có ID lớn nhất hiện tại MỘT LẦN DUY NHẤT
+    const lastAnhSanPham = await db.anh_san_pham.findFirst({
+      orderBy: {
+        id: "desc", // Lấy ID lớn nhất (ví dụ: ASP05)
+      },
+    });
+
+    let currentNumber = 0;
+    if (lastAnhSanPham) {
+      currentNumber = parseInt(lastAnhSanPham.id.replace(/\D/g, ""), 10) || 0;
+    }
+
+    // 2. Duyệt qua mảng payload và tự sinh ID tuần tự cho từng ảnh trong bộ nhớ
+    const dataToInsert = payloads.map((payload) => {
+      currentNumber++; // Tăng số thứ tự lên (ví dụ: 5 -> 6 -> 7)
+      const generatedId = `ASP${String(currentNumber).padStart(4, "0")}`; // Thành ASP06, ASP07...
+
+      const itemWithId = {
+        ...payload,
+        id: payload.id || generatedId, // Nếu client không truyền thì lấy mã tự sinh
+      };
+
+      return this.extractAnhSanPhamData(itemWithId);
+    });
+
     try {
-      // Thực hiện create thông qua tx
-      return await db.anh_san_pham.create({
-        data: data,
+      // 3. Thực hiện insert hàng loạt (Bulk Insert) bằng createMany cực nhanh
+      await db.anh_san_pham.createMany({
+        data: dataToInsert,
       });
+
+      return dataToInsert; // Trả về danh sách ảnh vừa tạo thành công
     } catch (error) {
       // P2003: Vi phạm ràng buộc Khóa ngoại (id_san_pham không tồn tại)
       if (error.code === "P2003") {

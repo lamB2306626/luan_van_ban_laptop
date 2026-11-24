@@ -1,7 +1,11 @@
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+const prisma = require("../utils/prisma");
+const ThongBaoService = require("./thong-bao.service");
 
 class PhieuKhachHangService {
+  constructor() {
+    this.thongBaoService = new ThongBaoService();
+  }
+
   // Lọc lấy các trường thuộc tính hợp lệ của Phiếu Khách Hàng
   extractPhieuKhachHangData(payload) {
     const phieuKhachHang = {
@@ -125,7 +129,7 @@ class PhieuKhachHangService {
         const records = payload.danh_sach_id_khach_hang.map((idKhachHang) => {
           startNum += 1;
           return {
-            id: `PKH${String(startNum).padStart(2, "0")}`,
+            id: `PKH${String(startNum).padStart(4, "0")}`,
             id_phieu_giam_gia: payload.id_phieu_giam_gia,
             id_khach_hang: idKhachHang,
             trang_thai:
@@ -163,7 +167,7 @@ class PhieuKhachHangService {
       const currentNumber = lastPhieuKhachHang
         ? parseInt(lastPhieuKhachHang.id.replace(/\D/g, ""), 10) || 0
         : 0;
-      payload.id = `PKH${String(currentNumber + 1).padStart(2, "0")}`;
+      payload.id = `PKH${String(currentNumber + 1).padStart(4, "0")}`;
     }
 
     const data = this.extractPhieuKhachHangData(payload);
@@ -185,7 +189,10 @@ class PhieuKhachHangService {
   }
 
   // 2. Tìm kiếm danh sách phiếu khách hàng theo bộ lọc (id, id_khach_hang, id_phieu_giam_gia, trang_thai)
-  async find(filterData) {
+  // app/services/phieu-khach-hang.service.js
+
+  async find(filterData, tx) {
+    const db = tx || prisma; // Hỗ trợ truyền Transaction nếu có
     const where = {};
 
     if (filterData.id) {
@@ -200,15 +207,42 @@ class PhieuKhachHangService {
       where.id_phieu_giam_gia = filterData.id_phieu_giam_gia;
     }
 
+    // Trạng thái phiếu khách hàng (true: chưa dùng, false: đã dùng)
     if (filterData.trang_thai !== undefined) {
       where.trang_thai = filterData.trang_thai;
     }
 
-    return await prisma.phieu_khach_hang.findMany({
+    // Lọc theo điều kiện Khả Dụng / Còn Hạn Sử Dụng của Phiếu Giảm Giá
+    if (filterData.kha_dung !== undefined) {
+      const now = new Date();
+
+      where.phieu_giam_gia = {
+        ...(where.phieu_giam_gia || {}),
+        // Nếu kha_dung === true: Ngày bắt đầu <= Hiện tại <= Ngày hết hạn
+        ...(filterData.kha_dung === true && {
+          ngay_bat_dau: { lte: now },
+          ngay_het_han: { gte: now },
+        }),
+        // Nếu kha_dung === false: Đã hết hạn (Ngày hết hạn < Hiện tại)
+        ...(filterData.kha_dung === false && {
+          ngay_het_han: { lt: now },
+        }),
+      };
+    }
+
+    // Lọc theo trạng thái (Hoạt động/Khóa) của Phiếu Giảm Giá
+    if (filterData.trang_thai_khoa !== undefined) {
+      where.phieu_giam_gia = {
+        ...(where.phieu_giam_gia || {}),
+        trang_thai: filterData.trang_thai_khoa === true,
+      };
+    }
+
+    return await db.phieu_khach_hang.findMany({
       where: where,
       include: {
         khach_hang: true,
-        phieu_giam_gia: true,
+        phieu_giam_gia: true, // Lấy kèm thông tin chi tiết phiếu
       },
       orderBy: {
         id: "desc",
@@ -275,6 +309,34 @@ class PhieuKhachHangService {
         phieu_giam_gia: true,
       },
     });
+  }
+
+  async tangPhieuByAdmin(payload, tx) {
+    const db = tx || prisma;
+
+    // 1. Gọi hàm create của chính service này để ghi DB
+    const result = await this.create(payload, db);
+
+    // 2. Lấy thông tin phiếu giảm giá để làm nội dung thông báo
+    const phieuGiamGia = await db.phieu_giam_gia.findUnique({
+      where: { id: payload.id_phieu_giam_gia },
+    });
+
+    // 3. Chuẩn bị danh sách ID khách hàng nhận thông báo
+    const listIds = Array.isArray(payload.danh_sach_id_khach_hang)
+      ? payload.danh_sach_id_khach_hang
+      : [payload.id_khach_hang];
+
+    // 4. Gửi thông báo ngữ cảnh "ADMIN TẶNG"
+    await this.thongBaoService.sendTangPhieuNotification(
+      {
+        phieuGiamGia,
+        danhSachIdKhachHang: listIds,
+      },
+      db,
+    );
+
+    return result;
   }
 }
 

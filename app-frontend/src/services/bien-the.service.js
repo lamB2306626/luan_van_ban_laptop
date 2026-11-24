@@ -17,13 +17,7 @@ class BienTheService {
 
   // 3. Tạo mới một danh mục
   async create(formData) {
-    return (
-      await this.api.post("/", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      })
-    ).data;
+    return (await this.api.post("/", formData)).data;
   }
 
   // 4. Cập nhật thông tin danh mục theo ID
@@ -40,6 +34,11 @@ class BienTheService {
   // 5. Xóa 1 danh mục theo ID
   async delete(id) {
     return (await this.api.delete(`/${id}`)).data;
+  }
+
+  // 6. Khôi phục 1 biến thể theo ID
+  async restore(id) {
+    return (await this.api.patch(`/${id}/restore`)).data;
   }
 
   // 6. Xóa tất cả danh mục

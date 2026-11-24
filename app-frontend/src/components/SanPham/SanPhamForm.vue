@@ -1,5 +1,9 @@
 <template>
-  <Form @submit="submitSanPham" :validation-schema="sanPhamFormSchema">
+  <Form
+    ref="innerForm"
+    @submit="submitSanPham"
+    :validation-schema="sanPhamFormSchema"
+  >
     <!-- Mã Sản Phẩm: Chỉ hiển thị khi Cập nhật (isEdit = true) và ở trạng thái disabled -->
     <div v-if="isEdit" class="form-group mb-3">
       <label for="id">Mã Sản Phẩm:</label>
@@ -13,6 +17,30 @@
       <ErrorMessage name="id" class="text-danger small" />
     </div>
 
+    <!-- Trạng Thái -->
+    <div v-if="isEdit" class="form-group mb-3">
+      Trạng thái:
+      <span
+        v-if="sanPham.trang_thai === 'DANG_KINH_DOANH'"
+        class="badge bg-success"
+      >
+        Đang kinh doanh
+      </span>
+      <span
+        v-else-if="sanPham.trang_thai === 'NGUNG_KINH_DOANH'"
+        class="badge bg-secondary"
+      >
+        Ngừng kinh doanh
+      </span>
+      <span
+        v-else-if="sanPham.trang_thai === 'DANG_HOAN_THIEN'"
+        class="badge bg-warning text-dark"
+      >
+        Đang hoàn thiện
+      </span>
+      <span v-else class="badge bg-light text-dark">Khác</span>
+    </div>
+
     <!-- Tên Sản Phẩm -->
     <div class="form-group mb-3">
       <label for="ten_san_pham"
@@ -24,9 +52,22 @@
         class="form-control"
         v-model="sanPhamLocal.ten_san_pham"
         placeholder="Nhập tên sản phẩm (VD: Laptop Asus ROG Strix)..."
+        @input="emitChange"
+        :disabled="!canManageSanPham"
       />
       <ErrorMessage name="ten_san_pham" class="text-danger small" />
     </div>
+
+    <!-- Trạng Thái -->
+    <!-- <div class="form-group mb-3 form-check">
+      <input
+        type="checkbox"
+        class="form-check-input"
+        id="trang_thai"
+        v-model="sanPhamLocal.trang_thai"
+      />
+      <label class="form-check-label" for="trang_thai">Đang kinh doanh</label>
+    </div> -->
 
     <!-- Mã Thương Hiệu -->
     <div class="form-group mb-3">
@@ -42,6 +83,8 @@
             value-key="id"
             placeholder="Nhập tên hoặc mã Thương Hiệu để tìm..."
             class="flex-grow-1"
+            @update:modelValue="emitChange"
+            :disabled="!canManageSanPham"
           >
             <!-- Custom lại cách hiển thị danh sách dạng [MÃ] TÊN -->
             <!-- <template #option="{ item }">
@@ -55,6 +98,7 @@
           class="btn btn-outline-success"
           title="Thêm thương hiệu mới"
           @click="openQuickCreate('thuong-hieu')"
+          :disabled="!canManageSanPham"
         >
           <i class="fas fa-plus"></i>
         </button>
@@ -76,6 +120,8 @@
             value-key="id"
             placeholder="Nhập tên hoặc mã Danh Mục để tìm..."
             class="flex-grow-1"
+            @update:modelValue="emitChange"
+            :disabled="!canManageSanPham"
           >
             <!-- Custom lại cách hiển thị danh sách dạng [MÃ] TÊN -->
             <!-- <template #option="{ item }">
@@ -89,6 +135,7 @@
           class="btn btn-outline-success"
           title="Thêm danh mục mới"
           @click="openQuickCreate('danh-muc')"
+          :disabled="!canManageSanPham"
         >
           <i class="fas fa-plus"></i>
         </button>
@@ -96,38 +143,39 @@
       <ErrorMessage name="id_danh_muc" class="text-danger small" />
     </div>
 
-    <!-- Mã Nhà Cung Cấp -->
+    <!-- Danh sách Nhà Cung Cấp -->
     <div class="form-group mb-3">
-      <label for="id_nha_cc"
-        >Nhà Cung Cấp <span class="text-danger">*</span>:</label
-      >
+      <label>Nhà Cung Cấp <span class="text-danger">*</span>:</label>
       <div class="input-group">
-        <Field name="id_nha_cc" v-model="sanPhamLocal.id_nha_cc">
-          <BaseSearchSelect
-            v-model="sanPhamLocal.id_nha_cc"
+        <Field
+          name="danh_sach_nha_cung_cap"
+          v-model="sanPhamLocal.danh_sach_nha_cung_cap"
+          v-slot="{ errors }"
+        >
+          <!-- Component chọn nhiều nhà cung cấp -->
+          <BaseMultiSearchSelect
+            v-model="sanPhamLocal.danh_sach_nha_cung_cap"
             :options="dsNhaCungCap"
             label-key="ten_ncc"
             value-key="id"
-            placeholder="Nhập tên hoặc mã Nhà Cung Cấp để tìm..."
-            class="flex-grow-1"
-          >
-            <!-- Custom lại cách hiển thị danh sách dạng [MÃ] TÊN -->
-            <!-- <template #option="{ item }">
-              <span class="fw-bold text-secondary">[{{ item.id }}]</span>
-              {{ item.ten_ncc }}
-            </template> -->
-          </BaseSearchSelect>
+            placeholder="Chọn các nhà cung cấp sản phẩm..."
+            :invalid="errors.length > 0"
+            @update:modelValue="emitChange"
+            :disabled="!canManageSanPham"
+          />
         </Field>
+
         <button
           type="button"
           class="btn btn-outline-success"
-          title="Thêm nhà cung cấp mới"
+          title="Thêm danh mục mới"
           @click="openQuickCreate('nha-cung-cap')"
+          :disabled="!canManageSanPham"
         >
           <i class="fas fa-plus"></i>
         </button>
       </div>
-      <ErrorMessage name="id_nha_cc" class="text-danger small" />
+      <ErrorMessage name="danh_sach_nha_cung_cap" class="text-danger small" />
     </div>
 
     <!-- Mô tả -->
@@ -140,134 +188,34 @@
         class="form-control"
         v-model="sanPhamLocal.mo_ta"
         placeholder="Nhập mô tả cho sản phẩm (nếu có)..."
+        @input="emitChange"
+        :disabled="!canManageSanPham"
       />
       <ErrorMessage name="mo_ta" class="text-danger small" />
     </div>
 
-    <!-- Trạng Thái -->
-    <!-- <div class="form-group mb-3 form-check">
-      <input
-        type="checkbox"
-        class="form-check-input"
-        id="trang_thai"
-        v-model="sanPhamLocal.trang_thai"
+    <!-------- KHOẢNG UPLOAD NHIỀU ẢNH SẢN PHẨM ---- -->
+    <Field
+      name="previewImages"
+      v-model="sanPhamLocal.previewImages"
+      v-slot="{ errors }"
+    >
+      <ProductImageUploader
+        v-model="sanPhamLocal.previewImages"
+        :initial-images="sanPhamLocal.anh_san_pham"
+        :canManageSanPham="canManageSanPham"
+        @update:modelValue="emitChange"
       />
-      <label class="form-check-label" for="trang_thai">Đang kinh doanh</label>
-    </div> -->
-
-    <!-- ================= KHOẢNG UPLOAD NHIỀU ẢNH SẢN PHẨM ================= -->
-    <div class="form-group mb-4 border rounded p-3 bg-light">
-      <label class="fw-bold mb-2">
-        <i class="fas fa-images me-1"></i> Hình Ảnh Sản Phẩm:
-      </label>
-
-      <!-- Nút chọn file -->
-      <div class="mb-3">
-        <input
-          type="file"
-          ref="fileInput"
-          id="productImagesInput"
-          class="d-none"
-          multiple
-          accept="image/*"
-          @change="handleFileSelect"
-        />
-        <button
-          type="button"
-          class="btn btn-outline-primary btn-sm"
-          @click="triggerFileInput"
-        >
-          <i class="fas fa-cloud-upload-alt me-1"></i> Chọn danh sách ảnh
-        </button>
-        <small class="text-muted ms-2"
-          >(Có thể chọn nhiều ảnh, nhấp radio để đặt ảnh đại diện chính)</small
-        >
-      </div>
-
-      <!-- Danh sách ảnh Xem Trước (Preview List) -->
-      <div v-if="previewImages.length > 0" class="row g-3">
-        <div
-          v-for="(img, index) in previewImages"
-          :key="index"
-          class="col-6 col-sm-4 col-md-3"
-        >
-          <div
-            class="card h-100 position-relative image-card"
-            :class="{ 'border-primary border-2 shadow-sm': img.la_anh_chinh }"
-          >
-            <!-- Badge Ảnh chính -->
-            <span
-              v-if="img.la_anh_chinh"
-              class="position-absolute top-0 start-0 badge bg-primary m-1 z-1"
-            >
-              Ảnh chính
-            </span>
-
-            <!-- Nút xóa ảnh -->
-            <button
-              type="button"
-              class="btn btn-danger btn-sm position-absolute top-0 end-0 m-1 rounded-circle p-0"
-              style="width: 24px; height: 24px; line-height: 1"
-              title="Xóa ảnh này"
-              @click="removeImage(index)"
-            >
-              <i class="fas fa-times"></i>
-            </button>
-
-            <!-- Thẻ ảnh preview -->
-            <div class="ratio ratio-1x1 overflow-hidden bg-white rounded-top">
-              <img
-                :src="img.url"
-                class="card-img-top object-fit-cover"
-                alt="Ảnh sản phẩm"
-              />
-            </div>
-
-            <!-- Radio Chọn làm ảnh chính -->
-            <div class="card-footer p-2 text-center bg-white">
-              <div class="form-check d-inline-block m-0">
-                <input
-                  class="form-check-input cursor-pointer"
-                  type="radio"
-                  :name="'mainImageRadio'"
-                  :id="'radioImg_' + index"
-                  :checked="img.la_anh_chinh"
-                  @change="setMainImage(index)"
-                />
-                <label
-                  class="form-check-label small cursor-pointer"
-                  :for="'radioImg_' + index"
-                >
-                  Ảnh chính
-                </label>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div
-        v-else
-        class="text-center py-4 text-muted border border-dashed rounded bg-white"
-      >
-        <i class="fas fa-image fa-2x mb-2 d-block text-secondary"></i>
-        Chưa có hình ảnh nào được chọn.
-      </div>
-    </div>
-    <!-- =================================================================== -->
+      <ErrorMessage name="previewImages" class="text-danger small" />
+    </Field>
 
     <!-- Các nút hành động -->
-    <div class="form-group">
-      <button class="btn btn-primary">
-        <i class="fas fa-save"></i> Lưu lại
-      </button>
+    <div v-if="showSubmitButton" class="form-group mt-4">
       <button
-        v-if="!isEdit"
-        type="button"
-        class="btn btn-secondary ms-2"
-        @click="cancel"
+        class="btn btn-primary"
+        :class="{ 'btn-permission-muted': !canManageSanPham }"
       >
-        <i class="fas fa-times"></i> Hủy
+        <i class="fas fa-save"></i> Lưu thông tin
       </button>
     </div>
   </Form>
@@ -288,8 +236,8 @@ import QuickCreateModal from "@/components/Common/QuickCreateModal.vue";
 
 // Import Modal Vừa tìm, vừa chọn Dùng Chung
 import BaseSearchSelect from "@/components/Common/BaseSearchSelect.vue";
-
-const API_URL = import.meta.env.VITE_API_BASE_URL;
+import BaseMultiSearchSelect from "@/components/Common/BaseMultiSearchSelect.vue";
+import ProductImageUploader from "@/components/SanPham/ProductImageUploader.vue";
 
 export default {
   name: "SanPhamForm",
@@ -299,6 +247,8 @@ export default {
     ErrorMessage,
     QuickCreateModal,
     BaseSearchSelect,
+    BaseMultiSearchSelect,
+    ProductImageUploader,
   },
   props: {
     sanPham: {
@@ -307,15 +257,27 @@ export default {
         ten_san_pham: "",
         id_thuong_hieu: "",
         id_danh_muc: "",
-        id_nha_cc: "",
+        danh_sach_nha_cung_cap: [], // <-- Thay id_nha_cc thành mảng này
         mo_ta: "",
         trang_thai: true,
         anh_san_pham: [],
+        // Mảng lưu danh sách ảnh hiển thị preview
+        // Mỗi phần tử có cấu trúc: { file: File|null, url: string, la_anh_chinh: boolean, isOld: boolean, id?: string }
+        previewImages: [],
       }),
     },
     isEdit: { type: Boolean, default: false },
+    canManageSanPham: {
+      type: Boolean,
+      default: false, // người dùng hiện tại có quyền thêm/sửa sản phẩm hay không
+    },
+    // Điều khiển ẩn/hiện nút submit để khi dùng component này trong trang thêm sản phẩm thì bỏ nút lưu ra cho đẹp
+    showSubmitButton: {
+      type: Boolean,
+      default: true,
+    },
   },
-  emits: ["submit:sanPham"],
+  emits: ["update:sanPham", "submit:sanPham"],
   data() {
     // Validation schema kiểm tra dữ liệu đầu vào bằng Yup
     const sanPhamFormSchema = yup.object().shape({
@@ -332,107 +294,65 @@ export default {
         .string()
         .required("Mã danh mục không được để trống.")
         .max(8, "Mã danh mục không vượt quá 8 ký tự."),
-      id_nha_cc: yup
-        .string()
-        .required("Mã nhà cung cấp không được để trống.")
-        .max(8, "Mã nhà cung cấp không vượt quá 8 ký tự."),
+      danh_sach_nha_cung_cap: yup
+        .array()
+        .of(yup.mixed()) // Đảm bảo Yup nhận dạng đúng mảng phần tử
+        .min(1, "Vui lòng chọn ít nhất 1 nhà cung cấp.")
+        .required("Vui lòng chọn ít nhất 1 nhà cung cấp."),
       mo_ta: yup.string().nullable(),
+      previewImages: yup
+        .array()
+        .of(yup.mixed()) // Đảm bảo Yup nhận dạng đúng mảng phần tử
+        .min(1, "Vui lòng tải lên ít nhất 1 hình ảnh sản phẩm.")
+        .required("Vui lòng tải lên ít nhất 1 hình ảnh sản phẩm."),
     });
 
     return {
-      sanPhamLocal: { ...this.sanPham },
+      sanPhamLocal: {
+        previewImages: [], // Đảm bảo previewImages luôn là mảng
+        ...this.sanPham,
+      },
+
       dsDanhMuc: [],
       dsThuongHieu: [],
       dsNhaCungCap: [],
       sanPhamFormSchema,
-
-      // Mảng lưu danh sách ảnh hiển thị preview
-      // Mỗi phần tử có cấu trúc: { file: File|null, url: string, la_anh_chinh: boolean, isOld: boolean, id?: string }
-      previewImages: [],
     };
   },
+
   watch: {
     // Cập nhật lại dữ liệu local khi props `sanPham` thay đổi (khi load dữ liệu edit về)
     sanPham: {
       handler(newVal) {
         this.sanPhamLocal = { ...newVal };
-        this.initOldImages();
+
+        // Trích xuất id của sanPhamLocal.danh_sach_nha_cung_cap để truyền vào trong BaseMultiSearchSelectm (chọn ds nhà cung cấp)
+        // component này thực hiện so sánh mảng id này với mảng ds tất cả id nhà cung cấp để xác định được giá trị được tick chọn
+        // ban đầu
+        if (Array.isArray(newVal.nha_cung_cap_san_pham)) {
+          this.sanPhamLocal.danh_sach_nha_cung_cap =
+            newVal.nha_cung_cap_san_pham.map((item) => item.id_nha_cc);
+        }
       },
       deep: true,
-      immediate: true, // Chạy ngay lập tức khi component khởi tạo để kịp gọi initOldImages hiển thị danh sách ảnh cũ ngay
+      immediate: true,
     },
   },
+
   methods: {
-    // Hàm kích hoạt mở cửa sổ chọn file an toàn
-    triggerFileInput() {
-      if (this.$refs.fileInput) {
-        this.$refs.fileInput.click();
-      }
+    // ==================== Phát tín hiệu không có quyền thực hiện thao tác ====================
+    notifyAccessDenied(message = "Bạn không có quyền thực hiện thao tác này!") {
+      window.dispatchEvent(
+        new CustomEvent("admin-access-denied", {
+          detail: { message },
+        }),
+      );
     },
 
-    // Nạp danh sách ảnh đã có từ server khi ở chế độ Chỉnh sửa (isEdit)
-    initOldImages() {
-      if (
-        this.sanPhamLocal.anh_san_pham &&
-        Array.isArray(this.sanPhamLocal.anh_san_pham)
-      ) {
-        this.previewImages = this.sanPhamLocal.anh_san_pham.map((img) => ({
-          id: img.id,
-          file: null,
-          url: `${API_URL}/uploads/AnhSanPham/${img.duong_dan_anh}`,
-          duong_dan_anh: img.duong_dan_anh,
-          la_anh_chinh: !!img.la_anh_chinh,
-          isOld: true,
-        }));
-      }
-    },
-
-    // Xử lý khi chọn file từ máy tính
-    handleFileSelect(event) {
-      const files = Array.from(event.target.files);
-      if (!files.length) return;
-
-      const newImages = files.map((file) => ({
-        file: file,
-        url: URL.createObjectURL(file),
-        la_anh_chinh: false,
-        isOld: false,
-      }));
-
-      this.previewImages.push(...newImages);
-
-      // Nếu chưa có ảnh nào được chọn làm ảnh chính -> Đặt ảnh đầu tiên làm ảnh chính
-      if (
-        !this.previewImages.some((img) => img.la_anh_chinh) &&
-        this.previewImages.length > 0
-      ) {
-        this.previewImages[0].la_anh_chinh = true;
-      }
-
-      // Reset value của input file để có thể chọn lại cùng 1 file nếu muốn
-      event.target.value = "";
-    },
-
-    // Đặt ảnh chỉ định làm ảnh chính
-    setMainImage(selectedIndex) {
-      this.previewImages.forEach((img, idx) => {
-        img.la_anh_chinh = idx === selectedIndex;
+    emitChange() {
+      this.$nextTick(() => {
+        this.$emit("update:sanPham", this.sanPhamLocal);
       });
-    },
-
-    // Xóa ảnh khỏi danh sách
-    removeImage(index) {
-      const removed = this.previewImages.splice(index, 1)[0];
-
-      // Tải lại bộ nhớ URL blob nếu là file mới tải lên
-      if (removed && !removed.isOld && removed.url) {
-        URL.revokeObjectURL(removed.url);
-      }
-
-      // Nếu vừa xóa mất ảnh chính và vẫn còn ảnh khác -> Chọn ảnh đầu tiên còn lại làm ảnh chính
-      if (removed?.la_anh_chinh && this.previewImages.length > 0) {
-        this.previewImages[0].la_anh_chinh = true;
-      }
     },
 
     // Lấy dữ liệu danh mục, thương hiệu, nhà cung cấp cho các ô Dropdown Select
@@ -453,17 +373,30 @@ export default {
 
     // Bắn sự kiện gửi dữ liệu form ra ngoài cho component cha
     submitSanPham() {
+      if (!this.canManageSanPham) {
+        this.notifyAccessDenied();
+        return;
+      }
+
       const formData = new FormData();
       formData.append("ten_san_pham", this.sanPhamLocal.ten_san_pham);
       formData.append("id_thuong_hieu", this.sanPhamLocal.id_thuong_hieu);
       formData.append("id_danh_muc", this.sanPhamLocal.id_danh_muc);
-      formData.append("id_nha_cc", this.sanPhamLocal.id_nha_cc);
       formData.append("mo_ta", this.sanPhamLocal.mo_ta);
 
-      formData.append("la_anh_chinh", JSON.stringify(this.previewImages));
+      formData.append(
+        "danh_sach_nha_cung_cap",
+        JSON.stringify(this.sanPhamLocal.danh_sach_nha_cung_cap),
+      );
 
-      this.previewImages.forEach((img) => {
-        if (img.file) {
+      // Đảm bảo previewImages là mảng trước khi dùng JSON.stringify
+      formData.append(
+        "la_anh_chinh",
+        JSON.stringify(this.sanPhamLocal.previewImages || []),
+      );
+
+      this.sanPhamLocal.previewImages?.forEach((img) => {
+        if (img && img.file) {
           formData.append("images", img.file);
         }
       });
@@ -486,15 +419,18 @@ export default {
     // Nhận kết quả từ QuickCreateModal -> Tải lại danh sách -> Chọn tự động mục vừa tạo
     async handleQuickCreated({ type, data }) {
       await this.fetchDropdownData(); // Cập nhật lại toàn bộ danh sách select
+
       const createdId = data?.data.id;
       if (!createdId) return;
+
       // Gán ID vừa tạo vào ô Select tương ứng
       if (type === "thuong-hieu") {
         this.sanPhamLocal.id_thuong_hieu = createdId;
       } else if (type === "danh-muc") {
         this.sanPhamLocal.id_danh_muc = createdId;
       } else if (type === "nha-cung-cap") {
-        this.sanPhamLocal.id_nha_cc = createdId;
+        const i = this.sanPhamLocal.danh_sach_nha_cung_cap.length;
+        this.sanPhamLocal.danh_sach_nha_cung_cap[i] = createdId;
       }
     },
   },
@@ -503,9 +439,14 @@ export default {
     await this.fetchDropdownData();
 
     // 2. Sau khi đã có dsThuongHieu, dsDanhMuc,.. mới gán dữ liệu cho form Edit
-    // if (this.isEdit) {
-    //   this.sanPhamLocal = { ...this.sanPham };
-    // }
+    if (this.isEdit) {
+      this.sanPhamLocal = { ...this.sanPham };
+      // Gán nha_cung_cap_san_pham (dữ liệu trả về từ backend) vào cho
+      // this.sanPhamLocal.danh_sach_nha_cung_cap (thuộc tính đại diện cho danh sách nhà cung cấp của sản phẩm hiện tại)
+      // để hiển thị cho form edit
+      this.sanPhamLocal.danh_sach_nha_cung_cap =
+        this.sanPham.nha_cung_cap_san_pham.map((item) => item.id_nha_cc);
+    }
   },
 };
 </script>
@@ -519,5 +460,16 @@ export default {
 }
 .border-dashed {
   border-style: dashed !important;
+}
+</style>
+
+<style scoped>
+.btn-permission-muted {
+  opacity: 0.45;
+  cursor: pointer;
+}
+
+.btn-permission-muted:hover {
+  opacity: 0.65;
 }
 </style>

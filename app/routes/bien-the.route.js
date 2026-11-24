@@ -9,7 +9,7 @@ router.route("/:id/restore").patch(bienThe.restore);
 router
   .route("/")
   .get(bienThe.findAll)
-  .post(upload.single("image"), bienThe.create)
+  .post(bienThe.create)
   .delete(bienThe.deleteAll);
 
 router

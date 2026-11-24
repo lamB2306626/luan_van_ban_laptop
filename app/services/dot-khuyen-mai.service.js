@@ -1,7 +1,11 @@
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+const prisma = require("../utils/prisma");
+const ChiTietKhuyenMaiService = require("./chi-tiet-khuyen-mai.service");
 
 class DotKhuyenMaiService {
+  constructor() {
+    this.chiTietKhuyenMaiService = new ChiTietKhuyenMaiService();
+  }
+
   // Lọc lấy các trường thuộc tính hợp lệ
   extractDotKhuyenMaiData(payload) {
     const dotKhuyenMai = {
@@ -21,44 +25,75 @@ class DotKhuyenMaiService {
   }
 
   // 1. Tạo đợt khuyến mãi mới (Tự sinh mã DKM01, DKM02 nếu client không truyền id)
-  async create(payload, tx) {
-    const db = tx || prisma;
-
-    if (!payload.id) {
-      // Tìm đợt khuyến mãi có ID lớn nhất hiện tại
-      const lastDot = await db.dot_khuyen_mai.findFirst({
-        orderBy: {
-          id: "desc",
-        },
-      });
-
-      if (!lastDot) {
-        payload.id = "DKM01";
-      } else {
-        const currentNumber = parseInt(lastDot.id.replace(/\D/g, ""), 10) || 0;
-        payload.id = `DKM${String(currentNumber + 1).padStart(2, "0")}`;
-      }
-    }
-
-    const data = this.extractDotKhuyenMaiData(payload);
-
-    // Kiểm tra tính hợp lệ của ngày bắt đầu và ngày kết thúc
-    if (
-      data.ngay_bat_dau &&
-      data.ngay_ket_thuc &&
-      data.ngay_bat_dau > data.ngay_ket_thuc
-    ) {
-      throw new Error("NGAY_KET_THUC_PHAI_LON_HON_NGAY_BAT_DAU");
-    }
-
+  async create(payload) {
     try {
-      return await db.dot_khuyen_mai.create({
-        data: data,
+      // Sử dụng $transaction để đảm bảo tính toàn vẹn dữ liệu (Rollback nếu xảy ra lỗi)
+      const result = await prisma.$transaction(async (tx) => {
+        // 1.1. Tự sinh mã Đợt Khuyến Mãi (DKM01, DKM02...) nếu chưa có ID
+        if (!payload.id) {
+          const lastDot = await tx.dot_khuyen_mai.findFirst({
+            orderBy: {
+              id: "desc",
+            },
+          });
+
+          if (!lastDot) {
+            payload.id = "DKM0001";
+          } else {
+            const currentNumber =
+              parseInt(lastDot.id.replace(/\D/g, ""), 10) || 0;
+            payload.id = `DKM${String(currentNumber + 1).padStart(4, "0")}`;
+          }
+        }
+
+        // Trích xuất dữ liệu của bảng dot_khuyen_mai
+        const dataDotKM = this.extractDotKhuyenMaiData(payload);
+
+        // Kiểm tra tính hợp lệ của ngày bắt đầu và ngày kết thúc
+        if (
+          dataDotKM.ngay_bat_dau &&
+          dataDotKM.ngay_ket_thuc &&
+          dataDotKM.ngay_bat_dau > dataDotKM.ngay_ket_thuc
+        ) {
+          throw new Error("NGAY_KET_THUC_PHAI_LON_HON_NGAY_BAT_DAU");
+        }
+
+        // 1.2. Tạo bản ghi Đợt Khuyến Mãi chính
+        const newDotKhuyenMai = await tx.dot_khuyen_mai.create({
+          data: {
+            ...dataDotKM,
+            id: payload.id, // Đảm bảo gán ID vừa tự sinh
+          },
+        });
+
+        // 1.3. Thêm danh sách Chi Tiết Khuyến Mãi (nếu có gửi kèm từ mảng ds_chi_tiet tạm)
+        const dsChiTiet = payload.ds_chi_tiet;
+
+        if (Array.isArray(dsChiTiet) && dsChiTiet.length > 0) {
+          // Chuẩn bị dữ liệu gắn id_dot_km vào từng dòng chi tiết
+          const preparedChiTiet = dsChiTiet.map((ct) => ({
+            id_dot_km: newDotKhuyenMai.id,
+            id_san_pham: ct.id_san_pham,
+            loai_giam_gia: ct.loai_giam_gia,
+            gia_tri_giam: ct.gia_tri_giam,
+          }));
+
+          await this.chiTietKhuyenMaiService.create(preparedChiTiet, tx);
+        }
+
+        return newDotKhuyenMai;
       });
+
+      return result;
     } catch (error) {
+      // Bẫy lỗi Prisma thường gặp
+      if (error.code === "P2003") {
+        throw new Error("KHOA_NGOAI_KHONG_TON_TAI");
+      }
       if (error.code === "P2002") {
         throw new Error("DOT_KHUYEN_MAI_DA_TON_TAI");
       }
+      // Ném lại các lỗi logic tự custom (ví dụ: ngày tháng không hợp lệ)
       throw error;
     }
   }

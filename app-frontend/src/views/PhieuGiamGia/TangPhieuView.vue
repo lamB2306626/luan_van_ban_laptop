@@ -171,7 +171,7 @@ export default {
 
       try {
         this.isSubmitting = true;
-        const res = await PhieuKhachHangService.create(payload);
+        const res = await PhieuKhachHangService.tangPhieuByAdmin(payload);
         alert(res.data?.message || "Tặng phiếu giảm giá thành công!");
         this.goBack();
       } catch (error) {

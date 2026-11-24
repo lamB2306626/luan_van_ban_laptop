@@ -1,5 +1,4 @@
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+const prisma = require("../utils/prisma");
 
 class GiaTriThuocTinhService {
   // Lọc lấy các trường thuộc tính hợp lệ của gia_tri_thuoc_tinh

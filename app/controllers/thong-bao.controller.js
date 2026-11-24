@@ -32,6 +32,7 @@ exports.findAll = async (req, res, next) => {
     const filterData = {
       id: req.query.id, // Lọc theo mã (?id=TB01)
       tieu_de: req.query.title, // Lọc theo tiêu đề (?title=KhuyenMai)
+      loai_thong_bao: req.query.loai_thong_bao,
     };
 
     const documents = await Service.find(filterData);
@@ -62,7 +63,12 @@ exports.findOne = async (req, res, next) => {
 // ============================== 4. Cập nhật Thông Báo theo id ==================================
 exports.update = async (req, res, next) => {
   if (!req.body || Object.keys(req.body).length === 0) {
-    return next(new ApiError(400, "Dữ liệu cập nhật không được để trống"));
+    return next(
+      new ApiError(
+        400,
+        "Dữ liệu cập nhật không được để trống không được để trống",
+      ),
+    );
   }
 
   try {
@@ -116,6 +122,25 @@ exports.deleteAll = async (req, res, next) => {
   } catch (error) {
     return next(
       new ApiError(500, "Đã xảy ra lỗi trong quá trình dọn dẹp các thông báo"),
+    );
+  }
+};
+
+// ============================== 7. Đếm số Thông Báo chưa đọc theo id khách hàng ==================================
+exports.countUnreadByKhachHangId = async (req, res, next) => {
+  try {
+    const Service = new ThongBaoService();
+    const document = await Service.countUnreadByKhachHangId(
+      req.params.id_khach_hang,
+    );
+
+    return res.send(document);
+  } catch (error) {
+    return next(
+      new ApiError(
+        500,
+        `Lỗi khi đếm thông báo chưa đọc với mã khách hàng = ${req.params.id_khach_hang}`,
+      ),
     );
   }
 };

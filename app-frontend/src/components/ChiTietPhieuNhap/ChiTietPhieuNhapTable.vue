@@ -1,6 +1,6 @@
 <template>
   <div class="table-responsive">
-    <table class="table table-bordered table-hover align-middle mb-0">
+    <table class="table table-bordered">
       <thead class="table-dark">
         <tr>
           <th class="text-center" style="width: 50px">STT</th>
@@ -64,6 +64,7 @@
           <!-- Thao tác Sửa / Xóa -->
           <td class="text-center">
             <button
+              type="button"
               class="btn btn-sm btn-outline-warning me-1"
               title="Chỉnh sửa"
               @click="onEdit(item)"

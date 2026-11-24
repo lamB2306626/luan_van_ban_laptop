@@ -3,9 +3,9 @@ const ApiError = require("../api-error");
 
 // ============================== 1. Tạo và lưu Phiếu Nhập mới ==================================
 exports.create = async (req, res, next) => {
-  // if (!req.body?.id_ncc) {
-  //   return next(new ApiError(400, "id_ncc không được để trống"));
-  // }
+  if (!req.body?.id_ncc) {
+    return next(new ApiError(400, "id_ncc không được để trống"));
+  }
 
   if (!req.body?.id_nhan_vien) {
     return next(new ApiError(400, "id_nhan_vien không được để trống"));
@@ -19,6 +19,7 @@ exports.create = async (req, res, next) => {
       data: document,
     });
   } catch (error) {
+    console.error("LỖI: ", error);
     if (error.message === "KHOA_NGOAI_KHONG_TON_TAI") {
       return next(
         new ApiError(
@@ -59,7 +60,12 @@ exports.findAll = async (req, res, next) => {
 // ============================== 3. Cập nhật Phiếu Nhập theo mã ==================================
 exports.update = async (req, res, next) => {
   if (Object.keys(req.body).length === 0) {
-    return next(new ApiError(400, "Dữ liệu cập nhật không được để trống"));
+    return next(
+      new ApiError(
+        400,
+        "Dữ liệu cập nhật không được để trống không được để trống",
+      ),
+    );
   }
 
   try {

@@ -28,20 +28,49 @@ exports.create = async (req, res, next) => {
       data: document,
     });
   } catch (error) {
-    if (error.message === "SAN_PHAM_HOAC_KHACH_HANG_KHONG_TON_TAI") {
+    console.log("LỖi: ", error);
+    if (error.message === "CHI_TIET_DON_HANG_KHONG_TON_TAI") {
+      return next(
+        new ApiError(404, "Chi tiết đơn hàng không tồn tại trong hệ thống"),
+      );
+    }
+
+    if (error.message === "KHONG_CO_QUYEN_DANH_GIA_DON_HANG_NAY") {
       return next(
         new ApiError(
           404,
-          "Sản phẩm hoặc Khách hàng không tồn tại trong hệ thống",
+          "Khách hàng này không có quyền đánh giá cho đơn hàng (Đơn hàng này không thuộc về khách hàng))",
         ),
       );
     }
 
-    if (error.message === "KHACH_HANG_DA_DANH_GIA_SAN_PHAM_NAY") {
+    if (error.message === "DON_HANG_CHUA_HOAN_THANH_KHONG_THE_DANH_GIA") {
+      return next(
+        new ApiError(
+          404,
+          "Đơn hàng chưa hoàn thành, không thể thực hiện dánh giá",
+        ),
+      );
+    }
+
+    if (error.message === "SAN_PHAM_KHONG_KHOP_VOI_DON_HANG") {
+      return next(new ApiError(404, "Sản phẩm không khớp với đơn hàng"));
+    }
+
+    if (error.message === "DU_LIEU_LIEN_KET_KHONG_HOP_LE") {
+      return next(
+        new ApiError(
+          404,
+          "Sản phẩm hoặc Khách hàng hoặc chi tiết đơn hàng không tồn tại trong hệ thống",
+        ),
+      );
+    }
+
+    if (error.message === "KHACH_HANG_DA_DANH_GIA_CHO_LAN_MUA_NAY") {
       return next(
         new ApiError(
           400,
-          "Khách hàng này đã gửi đánh giá cho sản phẩm này rồi",
+          "Khách hàng này đã gửi đánh giá sản phẩm cho lần mua này rồi",
         ),
       );
     }
@@ -74,7 +103,12 @@ exports.findAll = async (req, res, next) => {
 // ============================== 3. Cập nhật Đánh Giá theo mã id ==================================
 exports.update = async (req, res, next) => {
   if (Object.keys(req.body).length === 0) {
-    return next(new ApiError(400, "Dữ liệu cập nhật không được để trống"));
+    return next(
+      new ApiError(
+        400,
+        "Dữ liệu cập nhật không được để trống không được để trống",
+      ),
+    );
   }
 
   if (req.body.so_sao !== undefined) {

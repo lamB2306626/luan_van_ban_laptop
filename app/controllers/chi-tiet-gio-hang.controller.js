@@ -11,9 +11,9 @@ exports.create = async (req, res, next) => {
     return next(new ApiError(400, "id_bien_the không được để trống"));
   }
 
-    if (!req.body?.so_luong) {
-      return next(new ApiError(400, "so_luong không được để trống"));
-    }
+  if (!req.body?.so_luong) {
+    return next(new ApiError(400, "so_luong không được để trống"));
+  }
 
   try {
     const service = new ChiTietGioHangService();
@@ -69,7 +69,12 @@ exports.findAll = async (req, res, next) => {
 // ============================== 3. Cập nhật Chi Tiết Giỏ Hàng theo mã id ==================================
 exports.update = async (req, res, next) => {
   if (Object.keys(req.body).length === 0) {
-    return next(new ApiError(400, "Dữ liệu cập nhật không được để trống"));
+    return next(
+      new ApiError(
+        400,
+        "Dữ liệu cập nhật không được để trống không được để trống",
+      ),
+    );
   }
 
   try {
@@ -132,7 +137,9 @@ exports.delete = async (req, res, next) => {
 exports.deleteByGioHang = async (req, res, next) => {
   try {
     const service = new ChiTietGioHangService();
-    const deletedCount = await service.deleteByGioHangId(req.params.id_Gio_Hang);
+    const deletedCount = await service.deleteByGioHangId(
+      req.params.id_Gio_Hang,
+    );
 
     return res.send({
       message: `Đã làm sạch giỏ hàng (${deletedCount} sản phẩm đã xóa)`,
@@ -170,10 +177,12 @@ exports.findOne = async (req, res, next) => {
 
 // ============================== Thêm sản phẩm vào giỏ hàng ==================================
 exports.addToCart = async (req, res, next) => {
-  const { id_khach_hang, id_bien_the, so_luong } = req.body;
+  const { id_khach_hang, id_bien_the, so_luong, is_buy_now } = req.body;
 
   if (!id_khach_hang || !id_bien_the) {
-    return next(new ApiError(400, "id_khach_hang và id_bien_the không được để trống"));
+    return next(
+      new ApiError(400, "id_khach_hang và id_bien_the không được để trống"),
+    );
   }
 
   try {
@@ -182,6 +191,7 @@ exports.addToCart = async (req, res, next) => {
       id_khach_hang,
       id_bien_the,
       so_luong: so_luong || 1,
+      is_buy_now: Boolean(is_buy_now),
     });
 
     return res.status(200).send({
@@ -192,13 +202,51 @@ exports.addToCart = async (req, res, next) => {
     if (error.message === "BIEN_THE_KHONG_TON_TAI") {
       return next(new ApiError(404, "Biến thể sản phẩm không tồn tại"));
     }
-    if (error.message === "VUOT_QUA_SO_LUONG_TON_KHO") {
-      return next(new ApiError(400, "Số lượng thêm vào vượt quá số lượng tồn kho hiện có"));
-    }
+
     if (error.message === "SO_LUONG_KHONG_HOP_LE") {
       return next(new ApiError(400, "Số lượng không hợp lệ"));
     }
 
-    return next(new ApiError(500, "Đã xảy ra lỗi khi thêm sản phẩm vào giỏ hàng"));
+    if (error.message === "VUOT_QUA_GIOI_HAN_TOI_DA_3_SAN_PHAM") {
+      return next(
+        new ApiError(
+          400,
+          "Mỗi lần chỉ được thêm tối đa 3 sản phẩm cho mỗi phân loại",
+        ),
+      );
+    }
+
+    if (error.message === "SAU_KHI_THEM_VUOT_QUA_GIOI_HAN_TOI_DA_3_SAN_PHAM") {
+      const soLuongTrongGio = error.currentInCart || 0;
+      return next(
+        new ApiError(
+          400,
+          `Giỏ hàng của bạn đã có sẵn ${soLuongTrongGio} sản phẩm này. Tổng số lượng không được vượt quá 3 sản phẩm.`,
+        ),
+      );
+    }
+
+    if (error.message === "VUOT_QUA_SO_LUONG_TON_KHO") {
+      return next(
+        new ApiError(
+          400,
+          "Số lượng thêm vào giỏ vượt quá số lượng tồn kho hiện có",
+        ),
+      );
+    }
+
+    if (error.message === "SAU_KHI_THEM_VUOT_QUA_SO_LUONG_TON_KHO") {
+      const soLuongTrongGio = error.currentInCart || 0;
+      const tonKho = error.stockAvailable || 0;
+      return next(
+        new ApiError(
+          400,
+          `Giỏ hàng của bạn đã có sẵn ${soLuongTrongGio} sản phẩm này (kho hiện chỉ còn tối đa ${tonKho} sản phẩm).`,
+        ),
+      );
+    }
+    return next(
+      new ApiError(500, "Đã xảy ra lỗi khi thêm sản phẩm vào giỏ hàng"),
+    );
   }
 };

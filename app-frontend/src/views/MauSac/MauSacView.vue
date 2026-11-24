@@ -5,11 +5,19 @@
     <!-- Component Tìm kiếm Màu Sắc -->
     <MauSacSearch v-model="filter" @submit="retrieveMauSacs" />
 
-    <button class="btn btn-primary mb-3" @click="goToAddMauSac">
+    <button
+      class="btn btn-primary mb-3"
+      :class="{ 'btn-permission-muted': !canManageMauSac }"
+      @click="goToAddMauSac"
+    >
       <i class="fas fa-plus"></i> Thêm mới Màu Sắc
     </button>
 
-    <button class="btn btn-danger mb-3 ms-2" @click="deleteAllMauSacs">
+    <button
+      class="btn btn-danger mb-3 ms-2"
+      :class="{ 'btn-permission-muted': !canManageMauSac }"
+      @click="deleteAllMauSacs"
+    >
       <i class="fas fa-trash"></i> Xóa tất cả Màu Sắc
     </button>
 
@@ -28,6 +36,7 @@
           <td>
             <button
               class="btn btn-sm btn-secondary me-2"
+              :class="{ 'btn-permission-muted': !canManageMauSac }"
               @click="goToUpdateMauSac(mauSac.id)"
             >
               <i class="fas fa-edit"></i> Cập nhật
@@ -35,6 +44,7 @@
 
             <button
               class="btn btn-sm btn-danger"
+              :class="{ 'btn-permission-muted': !canManageMauSac }"
               @click="deleteMauSac(mauSac.id)"
             >
               <i class="fas fa-trash"></i> Xóa
@@ -57,6 +67,8 @@
 import MauSacSearch from "@/components/MauSac/MauSacSearch.vue";
 import MauSacService from "@/services/mau-sac.service";
 
+const ALLOWED_MAU_SAC_ROLES = ["Nhân viên kho", "Quản trị viên"];
+
 export default {
   name: "MauSacView",
   components: {
@@ -72,7 +84,36 @@ export default {
     };
   },
 
+  computed: {
+    currentAdminUser() {
+      try {
+        const userStr = localStorage.getItem("adminUser");
+        return userStr ? JSON.parse(userStr) : null;
+      } catch (e) {
+        return null;
+      }
+    },
+
+    adminRole() {
+      if (!this.currentAdminUser) return null;
+      return this.currentAdminUser.vai_tro.ten_vai_tro;
+    },
+
+    canManageMauSac() {
+      return !!this.adminRole && ALLOWED_MAU_SAC_ROLES.includes(this.adminRole);
+    },
+  },
+
   methods: {
+    // ==================== Phát tín hiệu không có quyền thực hiện thao tác ====================
+    notifyAccessDenied(message = "Bạn không có quyền thực hiện thao tác này!") {
+      window.dispatchEvent(
+        new CustomEvent("admin-access-denied", {
+          detail: { message },
+        }),
+      );
+    },
+
     // ==================== 1. Lấy danh sách Màu Sắc theo bộ lọc ====================
     async retrieveMauSacs() {
       try {
@@ -84,11 +125,19 @@ export default {
 
     // ==================== 2. Điều hướng tới Form Thêm Mới ====================
     goToAddMauSac() {
+      if (!this.canManageMauSac) {
+        this.notifyAccessDenied();
+        return;
+      }
       this.$router.push({ name: "mau-sac.add" });
     },
 
     // ==================== 3. Điều hướng tới Form Cập Nhật ====================
     goToUpdateMauSac(id) {
+      if (!this.canManageMauSac) {
+        this.notifyAccessDenied();
+        return;
+      }
       this.$router.push({
         name: "mau-sac.edit",
         params: { id: id },
@@ -97,6 +146,10 @@ export default {
 
     // ==================== 4. Xóa một Màu Sắc đơn lẻ ====================
     async deleteMauSac(id) {
+      if (!this.canManageMauSac) {
+        this.notifyAccessDenied();
+        return;
+      }
       if (confirm(`Bạn có chắc chắn muốn xóa Màu Sắc có mã "${id}" không?`)) {
         try {
           await MauSacService.delete(id);
@@ -117,13 +170,17 @@ export default {
 
     // ==================== 5. Xóa tất cả Màu Sắc ====================
     async deleteAllMauSacs() {
+      if (!this.canManageMauSac) {
+        this.notifyAccessDenied();
+        return;
+      }
       const confirm1 = confirm(
-        "CẢNH BÁO: Bạn có chắc chắn muốn xóa TẤT CẢ Màu Sắc không? Hành động này không thể hoàn tác!"
+        "CẢNH BÁO: Bạn có chắc chắn muốn xóa TẤT CẢ Màu Sắc không? Hành động này không thể hoàn tác!",
       );
 
       if (confirm1) {
         const confirm2 = confirm(
-          "BẠN CÓ THỰC SỰ CHẮC CHẮN? Tất cả dữ liệu Màu Sắc sẽ bị xóa sạch hoàn toàn!"
+          "BẠN CÓ THỰC SỰ CHẮC CHẮN? Tất cả dữ liệu Màu Sắc sẽ bị xóa sạch hoàn toàn!",
         );
 
         if (confirm2) {
@@ -151,3 +208,14 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+.btn-permission-muted {
+  opacity: 0.45;
+  cursor: pointer;
+}
+
+.btn-permission-muted:hover {
+  opacity: 0.65;
+}
+</style>

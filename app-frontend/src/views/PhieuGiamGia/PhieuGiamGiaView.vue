@@ -9,15 +9,27 @@
       @reset="retrievePhieuGiamGias"
     />
 
-    <button class="btn btn-primary mb-3" @click="goToAddPhieuGiamGia">
+    <button
+      class="btn btn-primary mb-3"
+      :class="{ 'btn-permission-muted': !canManagePhieuGiamGia }"
+      @click="goToAddPhieuGiamGia"
+    >
       <i class="fas fa-plus"></i> Thêm mới Phiếu Giảm Giá
     </button>
 
-    <button class="btn btn-danger mb-3 ms-2" @click="deleteAllPhieuGiamGias">
+    <button
+      class="btn btn-danger mb-3 ms-2"
+      :class="{ 'btn-permission-muted': !canManagePhieuGiamGia }"
+      @click="deleteAllPhieuGiamGias"
+    >
       <i class="fas fa-trash"></i> Xóa tất cả Phiếu Giảm Giá
     </button>
 
-    <button class="btn btn-success mb-3" @click="goToTangPhieuGiamGia">
+    <button
+      class="btn btn-success mb-3"
+      :class="{ 'btn-permission-muted': !canManagePhieuGiamGia }"
+      @click="goToTangPhieuGiamGia"
+    >
       <i class="fas fa-gift me-1"></i> Tặng Phiếu Giảm Giá
     </button>
 
@@ -82,17 +94,33 @@
             <td>
               <button
                 class="btn btn-sm btn-outline-success me-1"
+                :class="{ 'btn-permission-muted': !canManagePhieuGiamGia }"
                 title="Tặng phiếu này"
                 @click="goToTangPhieuGiamGiaOne(phieu.id)"
               >
                 <i class="fas fa-gift"></i>
               </button>
 
+              <!-- Nút Khóa / Mở khóa phiếu giảm giá -->
               <button
-                class="btn btn-sm btn-danger"
-                @click="deletePhieuGiamGia(phieu.id)"
+                class="btn btn-sm"
+                :class="[
+                  phieu.trang_thai ? 'btn-warning' : 'btn-success',
+                  { 'btn-permission-muted': !canManagePhieuGiamGia },
+                ]"
+                @click="toggleStatusphieuGiamGia(phieu)"
+                :title="
+                  phieu.trang_thai
+                    ? 'Khóa phiếu giảm giá'
+                    : 'Mở khóa phiếu giảm giá'
+                "
               >
-                <i class="fas fa-trash"></i> Xóa
+                <i
+                  :class="
+                    phieu.trang_thai ? 'fas fa-user-lock' : 'fas fa-user-check'
+                  "
+                ></i>
+                {{ phieu.trang_thai ? " Khóa" : " Mở khóa" }}
               </button>
             </td>
           </tr>
@@ -113,6 +141,8 @@
 import PhieuGiamGiaSearch from "@/components/PhieuGiamGia/PhieuGiamGiaSearch.vue";
 import PhieuGiamGiaService from "@/services/phieu-giam-gia.service";
 
+const ALLOWED_PHIEU_GIAM_GIA_ROLES = ["Nhân viên Marketing", "Quản trị viên"];
+
 export default {
   name: "PhieuGiamGiaView",
   components: {
@@ -130,7 +160,39 @@ export default {
     };
   },
 
+  computed: {
+    currentAdminUser() {
+      try {
+        const userStr = localStorage.getItem("adminUser");
+        return userStr ? JSON.parse(userStr) : null;
+      } catch (e) {
+        return null;
+      }
+    },
+
+    adminRole() {
+      if (!this.currentAdminUser) return null;
+      return this.currentAdminUser.vai_tro.ten_vai_tro;
+    },
+
+    canManagePhieuGiamGia() {
+      return (
+        !!this.adminRole &&
+        ALLOWED_PHIEU_GIAM_GIA_ROLES.includes(this.adminRole)
+      );
+    },
+  },
+
   methods: {
+    // ==================== Phát tín hiệu không có quyền thực hiện thao tác ====================
+    notifyAccessDenied(message = "Bạn không có quyền thực hiện thao tác này!") {
+      window.dispatchEvent(
+        new CustomEvent("admin-access-denied", {
+          detail: { message },
+        }),
+      );
+    },
+
     // ==================== 1. Lấy danh sách Phiếu Giảm Giá ====================
     async retrievePhieuGiamGias() {
       try {
@@ -142,36 +204,64 @@ export default {
 
     // ==================== 2. Điều hướng tới Form Thêm Mới ====================
     goToAddPhieuGiamGia() {
+      if (!this.canManagePhieuGiamGia) {
+        this.notifyAccessDenied();
+        return;
+      }
       this.$router.push({ name: "phieu-giam-gia.add" });
     },
 
     // ==================== 3. Điều hướng tới form tăng phiếu ====================
     async goToTangPhieuGiamGia() {
+      if (!this.canManagePhieuGiamGia) {
+        this.notifyAccessDenied();
+        return;
+      }
       this.$router.push({ name: "tang-phieu" });
     },
 
     async goToTangPhieuGiamGiaOne(id) {
+      if (!this.canManagePhieuGiamGia) {
+        this.notifyAccessDenied();
+        return;
+      }
       this.$router.push({
         name: "tang-phieu",
         params: { id: id },
       });
     },
 
-    // ==================== 4. Xóa một Phiếu Giảm Giá ====================
-    async deletePhieuGiamGia(id) {
+    // ==================== 2. Khóa (Delete) / Mở khóa (Restore) Phiếu Giảm Giá ====================
+    async toggleStatusphieuGiamGia(phieuGiamGia) {
+      if (!this.canManagePhieuGiamGia) {
+        this.notifyAccessDenied();
+        return;
+      }
+      const isLocking = phieuGiamGia.trang_thai;
+      const actionText = isLocking ? "KHÓA" : "MỞ KHÓA";
+
       if (
-        confirm(`Bạn có chắc chắn muốn xóa Phiếu Giảm Giá có mã "${id}" không?`)
+        confirm(
+          `Bạn có chắc chắn muốn ${actionText} phiếu giảm giá "${phieuGiamGia.ten_phieu}" không?`,
+        )
       ) {
         try {
-          await PhieuGiamGiaService.delete(id);
-          alert("Xóa Phiếu Giảm Giá thành công!");
+          if (isLocking) {
+            // Nếu phiếu giảm giá đang hoạt động -> Gọi hàm delete để Khóa phiếu giảm giá
+            await PhieuGiamGiaService.delete(phieuGiamGia.id);
+          } else {
+            // Nếu phiếu giảm giá đang bị khóa -> Gọi hàm restore để Khôi phục/Mở khóa phiếu giảm giá
+            await PhieuGiamGiaService.restore(phieuGiamGia.id);
+          }
+
+          alert(`${actionText} phiếu giảm giá thành công!`);
           this.retrievePhieuGiamGias();
         } catch (error) {
           console.error(error);
           const errorMessage =
             error.response?.data?.message ||
             error.response?.data ||
-            `Có lỗi xảy ra khi xóa phiếu giảm giá ${id}`;
+            `Có lỗi xảy ra khi ${actionText.toLowerCase()} phiếu giảm giá ${phieuGiamGia.id}`;
 
           alert(errorMessage);
         }
@@ -180,6 +270,10 @@ export default {
 
     // ==================== 5. Xóa tất cả Phiếu Giảm Giá ====================
     async deleteAllPhieuGiamGias() {
+      if (!this.canManagePhieuGiamGia) {
+        this.notifyAccessDenied();
+        return;
+      }
       const confirm1 = confirm(
         "CẢNH BÁO: Bạn có chắc chắn muốn xóa TẤT CẢ Phiếu Giảm Giá không? Hành động này không thể hoàn tác!",
       );
@@ -245,3 +339,14 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+.btn-permission-muted {
+  opacity: 0.45;
+  cursor: pointer;
+}
+
+.btn-permission-muted:hover {
+  opacity: 0.65;
+}
+</style>

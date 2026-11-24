@@ -209,7 +209,7 @@ export default {
         .string()
         .matches(phoneRegExp, "Số điện thoại không hợp lệ (VD: 0901234567).")
         .max(20, "Số điện thoại tối đa 20 ký tự."),
-      ngay_sinh: yup.string(),
+      ngay_sinh: yup.date().typeError("Ngày sinh không hợp lệ."),
       avatar: yup
         .mixed()
         .test("check-image", "Vui lòng chọn ảnh avatar.", () => {
@@ -221,7 +221,10 @@ export default {
     });
 
     return {
-      nhanVienLocal: { ...this.nhanVien, mat_khau: "" }, // Reset ô mật khẩu về rỗng khi load form
+      nhanVienLocal: {
+        ...this.formatDataForForm(this.nhanVien),
+        mat_khau: "",
+      }, // Reset ô mật khẩu về rỗng khi load form
       dsVaiTro: [],
       isSubmitting: false,
       nhanVienFormSchema,
@@ -235,27 +238,30 @@ export default {
   watch: {
     nhanVien: {
       handler(newVal) {
-        let formattedDate = newVal.ngay_sinh;
-        if (newVal.ngay_sinh) {
-          // Format ISO string về dạng YYYY-MM-DD để khớp với ô input datetime-local
-          formattedDate = new Date(newVal.ngay_sinh)
-            .toISOString()
-            .split("T")[0];
-        }
         this.nhanVienLocal = {
-          ...newVal,
+          ...this.formatDataForForm(newVal),
           mat_khau: "",
-          ngay_sinh: formattedDate,
         };
 
         if (newVal?.avatar && !this.selectedFile) {
-          this.previewImage = `${API_URL}/uploads/NhanVien/${newVal.avatar}`; //previewImage sẽ tự cập nhật
+          this.previewImage = `${API_URL}/uploads/NhanVien/${newVal.avatar}`;
         }
       },
       deep: true,
     },
   },
   methods: {
+    formatDataForForm(data) {
+      if (!data) return {};
+      const formatted = { ...data };
+      if (formatted.ngay_sinh) {
+        formatted.ngay_sinh = new Date(formatted.ngay_sinh)
+          .toISOString()
+          .split("T")[0];
+      }
+      return formatted;
+    },
+
     // Tải danh sách Vai Trò cho ô Chọn Dropdown
     async fetchDropdownData() {
       try {

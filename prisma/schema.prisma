@@ -28,16 +28,16 @@ model thuong_hieu {
   san_pham        san_pham[]
 }
 
-// Bảng Nhà cung cấp
 model nha_cung_cap {
-  id            String @id @db.VarChar(8)
-  ten_ncc       String @db.VarChar(50)
-  so_dien_thoai String @db.VarChar(20)
-  email         String? @db.VarChar(50)
-  dia_chi       String @db.VarChar(255)
+  id            String   @id @db.VarChar(8)
+  ten_ncc       String   @db.VarChar(50)
+  so_dien_thoai String   @db.VarChar(20)
+  email         String?  @db.VarChar(50)
+  dia_chi       String   @db.VarChar(255)
 
-  // phieu_nhap  phieu_nhap[]
-  san_pham    san_pham[]
+  // Khai báo quan hệ 1-N với bảng trung gian
+  nha_cung_cap_san_pham    nha_cung_cap_san_pham[]
+  phieu_nhap               phieu_nhap[]
 }
 
 // Bảng Sản phẩm
@@ -45,30 +45,42 @@ model san_pham {
   id             String      @id @db.VarChar(8)
   ten_san_pham   String      @unique @db.VarChar(50)
   mo_ta          String?     @db.Text
-  trang_thai     Boolean     @default(true)
+  trang_thai     String      @default("DANG_HOAN_THIEN") @db.VarChar(20)   // DANG_KINH_DOANH, NGUNG_KINH_DOANH, DANG_HOAN_THIEN
+  is_delete      Boolean     @default(false)
 
-  // Trường Khóa ngoại
+  // Trường Khóa ngoại (chỉ giữ lại thương hiệu và danh mục)
   id_thuong_hieu String      @db.VarChar(8)
   id_danh_muc    String      @db.VarChar(8)
-  id_nha_cc      String      @db.VarChar(8)
 
-  // Khai báo mối quan hệ khóa ngoại (Foreign Keys)
-  thuong_hieu    thuong_hieu    @relation(fields: [id_thuong_hieu], references: [id], onDelete: Restrict)
-  danh_muc       danh_muc       @relation(fields: [id_danh_muc], references: [id], onDelete: Restrict)
-  nha_cung_cap   nha_cung_cap   @relation(fields: [id_nha_cc], references: [id], onDelete: Restrict)
+  // Khai báo mối quan hệ khóa ngoại
+  thuong_hieu    thuong_hieu @relation(fields: [id_thuong_hieu], references: [id], onDelete: Restrict)
+  danh_muc       danh_muc    @relation(fields: [id_danh_muc], references: [id], onDelete: Restrict)
 
-  // Quan hệ 1-1 ảo chỉ hướng sang bảng Thông số
-  thong_so     thong_so?
-  // Quan hệ 1-N: Một sản phẩm có nhiều ảnh
-  anh_san_pham anh_san_pham[]
-  // Khai báo quan hệ 1-N với bien_the
-  bien_the bien_the[]
-  // Khai báo quan hệ 1-N với yeu_thich
-  yeu_thich yeu_thich[]
-  // Khai báo quan hệ 1-N với danh_gia
-  danh_gia danh_gia[]
-  // Khai báo quan hệ 1-N với chi_tiet_khuyen_mai
+  // Khai báo quan hệ 1-N với bảng trung gian
+  nha_cung_cap_san_pham nha_cung_cap_san_pham[]
+
+  // Các quan hệ khác giữ nguyên
+  thong_so       thong_so?
+  anh_san_pham   anh_san_pham[]
+  bien_the       bien_the[]
+  yeu_thich      yeu_thich[]
+  danh_gia       danh_gia[]
   chi_tiet_khuyen_mai chi_tiet_khuyen_mai[]
+  cuoc_tro_truyen     cuoc_tro_truyen[]
+  lich_su_xem         lich_su_xem[]
+}
+
+model nha_cung_cap_san_pham {
+  id          Int      @id @default(autoincrement()) 
+  id_nha_cc   String   @db.VarChar(8)
+  id_san_pham String   @db.VarChar(8)
+
+  // Khai báo quan hệ
+  nha_cung_cap nha_cung_cap @relation(fields: [id_nha_cc], references: [id], onDelete: Cascade)
+  san_pham     san_pham     @relation(fields: [id_san_pham], references: [id], onDelete: Cascade)
+
+  // Đảm bảo 1 nhà cung cấp không bị thêm trùng vào 1 sản phẩm
+  @@unique([id_nha_cc, id_san_pham])
 }
 
 // Bảng Thông số kỹ thuật (Child - Chứa khóa ngoại)
@@ -157,7 +169,8 @@ model bien_the {
   gia           Decimal  @db.Decimal(15, 2)
   so_luong      Int      @default(0) @db.Integer
   duong_dan_anh String?  @db.VarChar(30)
-  trang_thai    Boolean  @default(true)
+  trang_thai   Boolean  @default(true)
+  is_delete    Boolean  @default(false)
 
   // Khóa ngoại liên kết tới bảng san_pham
   san_pham   san_pham  @relation(fields: [id_san_pham], references: [id], onDelete: Restrict)
@@ -176,7 +189,6 @@ model bien_the {
   chi_tiet_don_hang      chi_tiet_don_hang[]
   // Mối quan hệ với chi_tiet_gio_hang
   chi_tiet_gio_hang      chi_tiet_gio_hang[]
-
 }
 
 // Bảng Vai trò
@@ -204,19 +216,24 @@ model nhan_vien {
   vai_tro     vai_tro  @relation(fields: [id_vai_tro], references: [id], onDelete: Restrict)
 
   phieu_nhap  phieu_nhap[]
-  don_hang           don_hang[]
+
+  // Các đơn hàng do nhân viên xử lý
+  don_hang  don_hang[]
+  tin_nhan  tin_nhan[]
 }
 
+
+//======================================================================
 // Bảng Phiếu nhập
 model phieu_nhap {
   id            String       @id @db.VarChar(8)
-  // id_ncc        String       @db.VarChar(8)
+  id_ncc        String       @db.VarChar(8)
   id_nhan_vien  String       @db.VarChar(8)
   tong_tien     Decimal      @default(0) @db.Decimal(15, 2)
   ngay_nhap     DateTime     @default(now())
 
   // Ràng buộc khóa ngoại
-  // nha_cung_cap  nha_cung_cap @relation(fields: [id_ncc], references: [id], onDelete: Restrict)
+  nha_cung_cap  nha_cung_cap @relation(fields: [id_ncc], references: [id], onDelete: Restrict)
   nhan_vien     nhan_vien    @relation(fields: [id_nhan_vien], references: [id], onDelete: Restrict)
 
   // Mối quan hệ 1-N với bảng chi_tiet_phieu_nhap
@@ -254,14 +271,16 @@ model hang_thanh_vien {
 model khach_hang {
   id                 String          @id @db.VarChar(8)
   ho_ten             String          @db.VarChar(50)
-  email              String          @unique @db.VarChar(50)
-  mat_khau           String          @db.VarChar(255)
+  email              String?          @unique @db.VarChar(50)
+  mat_khau           String?          @db.VarChar(255)
   so_dien_thoai      String?          @db.VarChar(20)
   ngay_sinh          DateTime?       @db.Date
-  avatar           String?  @db.VarChar(30)
+  avatar             String?        @db.VarChar(30)
   trang_thai         Boolean         @default(true)
   tong_chi_tieu      Decimal         @default(0) @db.Decimal(15, 2)
-  id_hang_thanh_vien String?          @db.VarChar(8)
+  id_hang_thanh_vien String?         @db.VarChar(8)
+  provider           String?         @db.VarChar(20)
+  providerid         String?         @db.VarChar(100)
 
   // Mối quan hệ khóa ngoại
   hang_thanh_vien    hang_thanh_vien? @relation(fields: [id_hang_thanh_vien], references: [id], onDelete: Restrict)
@@ -274,19 +293,37 @@ model khach_hang {
   phieu_khach_hang        phieu_khach_hang[]
   don_hang                don_hang[]
   gio_hang                gio_hang[]
+  lich_su_tro_truyen      lich_su_tro_truyen?
+  tin_nhan                tin_nhan[]
+  lich_su_tim_kiem        lich_su_tim_kiem[]
+  lich_su_xem             lich_su_xem[]
+  phien_chat_ai           phien_chat_ai[]
 }
 
 // Bảng Địa chỉ
 model dia_chi {
-  id              String     @id @db.VarChar(8)
-  id_khach_hang   String     @db.VarChar(8)
-  ten_nguoi_nhan  String     @db.VarChar(50)
-  sdt_nguoi_nhan  String     @db.VarChar(20)
-  dia_chi         String     @db.VarChar(255)
-  la_mac_dinh     Boolean    @default(false)
+  id             String     @id @db.VarChar(8)
+  id_khach_hang  String     @db.VarChar(8)
+  ten_nguoi_nhan String     @db.VarChar(50)
+  sdt_nguoi_nhan String     @db.VarChar(20)
+  
+  // Địa chỉ chi tiết do người dùng nhập (Ví dụ: Số 123, Đường Nguyễn Huệ)
+  dia_chi_cu_the String     @db.VarChar(255)
+
+  // Lưu mã định danh chuẩn của GHN phục vụ việc gọi API tính phí & tạo đơn
+  province_id    String     @db.VarChar(6)
+  district_id    String     @db.VarChar(6)        // Mã Quận/Huyện của GHN
+  ward_code      String     @db.VarChar(6)        // Mã Phường/Xã của GHN
+
+  // Lưu tên để hiển thị giao diện UI trực tiếp mà không cần gọi API GHN lại
+  ten_tinh       String     @db.VarChar(100)
+  ten_huyen      String     @db.VarChar(100)
+  ten_xa         String     @db.VarChar(100)
+
+  la_mac_dinh    Boolean    @default(false)
 
   // Mối quan hệ khóa ngoại (FK) liên kết với bảng khach_hang
-  khach_hang      khach_hang @relation(fields: [id_khach_hang], references: [id], onDelete: Cascade)
+  khach_hang     khach_hang @relation(fields: [id_khach_hang], references: [id], onDelete: Cascade)
 }
 
 // Bảng Thông Báo
@@ -296,6 +333,7 @@ model thong_bao {
   noi_dung           String              @db.Text
   lien_ket           String?             @db.VarChar(128)
   ngay_tao           DateTime            @default(now())
+  loai_thong_bao     String              @default("TU_DONG") @db.VarChar(15)
 
   // Mối quan hệ với bảng trung gian
   chi_tiet_thong_bao chi_tiet_thong_bao[]
@@ -338,16 +376,18 @@ model danh_gia {
   id            String   @id @db.VarChar(8)
   id_san_pham   String   @db.VarChar(8)
   id_khach_hang String   @db.VarChar(8)
+  id_chi_tiet_don_hang String @db.VarChar(8)
   so_sao        Int      @db.SmallInt
   noi_dung      String?  @db.Text
   ngay_danh_gia DateTime @default(now())
 
   // Quan hệ khóa ngoại
-  san_pham   san_pham   @relation(fields: [id_san_pham], references: [id], onDelete: Cascade)
-  khach_hang khach_hang @relation(fields: [id_khach_hang], references: [id], onDelete: Cascade)
+  san_pham     san_pham     @relation(fields: [id_san_pham], references: [id], onDelete: Cascade)
+  khach_hang   khach_hang   @relation(fields: [id_khach_hang], references: [id], onDelete: Cascade)
+  chi_tiet_don_hang   chi_tiet_don_hang    @relation(fields: [id_chi_tiet_don_hang], references: [id], onDelete: Cascade)
 
-  // Ràng buộc duy nhất: Mỗi khách hàng chỉ đánh giá 1 sản phẩm 1 lần (tùy chọn theo nghiệp vụ)
-  @@unique([id_san_pham, id_khach_hang])
+  // Ràng buộc duy nhất: Mỗi khách hàng chỉ đánh giá 1 sản phẩm 1 lần cho 1 lượt mua
+  @@unique([id_san_pham, id_khach_hang, id_chi_tiet_don_hang])
 }
 
 // Bảng Phiếu Giảm Giá
@@ -395,27 +435,55 @@ model phieu_hang_thanh_vien {
 
 // Bảng Đơn Hàng
 model don_hang {
-  id                    String          @id @db.VarChar(8)
-  id_khach_hang         String          @db.VarChar(8)
-  id_nhan_vien          String?         @db.VarChar(8)
-  id_phieu_giam_gia     String?         @db.VarChar(32)
-  tong_tien_goc         Decimal         @default(0) @db.Decimal(15, 2) 
-  tong_tien_giam_km     Decimal         @default(0) @db.Decimal(15, 2)
-  tong_tien_thanh_toan  Decimal         @default(0) @db.Decimal(15, 2)
-  trang_thai_don_hang   String          @default("CHO_DUYET") @db.VarChar(50)
-  trang_thai_thanh_toan String          @default("CHUA_THANH_TOAN") @db.VarChar(50)
-  ngay_dat              DateTime        @default(now())
-  ngay_giao             DateTime?
-  dia_chi               String          @db.VarChar(255)
-  ly_do_huy             String?         @db.VarChar(255)
+  id                    String   @id @db.VarChar(8)
+  id_khach_hang         String   @db.VarChar(8)
 
-  // Mối quan hệ khóa ngoại (Foreign Keys)
-  khach_hang         khach_hang      @relation(fields: [id_khach_hang], references: [id])
-  nhan_vien          nhan_vien?      @relation(fields: [id_nhan_vien], references: [id])
-  phieu_giam_gia     phieu_giam_gia? @relation(fields: [id_phieu_giam_gia], references: [id])
+  // Nhân viên xử lý đơn hàng
+  id_nhan_vien          String?  @db.VarChar(8)
 
-  // Mối quan hệ 1-N với chi tiết đơn hàng
-  chi_tiet_don_hang     chi_tiet_don_hang[]
+  phuong_thuc_thanh_toan   String @db.VarChar(20)
+
+  // Phiếu giảm giá được sử dụng
+  id_phieu_giam_gia     String?  @db.VarChar(32)
+
+  // Thông tin tiền
+  tong_tien_goc         Decimal  @default(0) @db.Decimal(15, 2)
+  tong_tien_giam_km     Decimal  @default(0) @db.Decimal(15, 2)
+  tien_van_chuyen       Decimal  @default(0) @db.Decimal(15, 2)
+  tong_tien_thanh_toan  Decimal  @default(0) @db.Decimal(15, 2)
+
+  // Trạng thái
+  trang_thai_don_hang   String   @default("CHO_DUYET") @db.VarChar(50)
+  trang_thai_thanh_toan String   @default("CHUA_THANH_TOAN") @db.VarChar(50)
+
+  // Thời gian
+  ngay_dat                DateTime @default(now())
+  ngay_giao               DateTime?
+  so_lan_thanh_toan_lai   Int      @default(0)
+
+  // Địa chỉ giao hàng
+  so_dien_thoai         String   @db.VarChar(20)
+  dia_chi               String   @db.VarChar(255)
+  // Các ID của GHN lưu lại để phục vụ việc tạo đơn / tra cứu vận đơn sau này
+  province_id     String   @db.VarChar(20)    
+  district_id     String   @db.VarChar(20)      
+  ward_code       String   @db.VarChar(20)
+
+  ma_van_don String? @db.VarChar(50)
+
+  // Thông tin hủy đơn
+  ly_do_huy             String?  @db.VarChar(255)
+
+  // =========================
+  // QUAN HỆ KHÓA NGOẠI
+  // =========================
+  khach_hang             khach_hang       @relation(fields: [id_khach_hang], references: [id])
+  nhan_vien              nhan_vien?        @relation(fields: [id_nhan_vien], references: [id])
+  phieu_giam_gia         phieu_giam_gia?    @relation(fields: [id_phieu_giam_gia], references: [id])
+  chi_tiet_don_hang      chi_tiet_don_hang[]
+
+  thanh_toan   thanh_toan[]
+  cuoc_tro_truyen     cuoc_tro_truyen[]
 }
 
 // Bảng Chi Tiết Đơn Hàng
@@ -431,8 +499,24 @@ model chi_tiet_don_hang {
   don_hang     don_hang  @relation(fields: [id_don_hang], references: [id], onDelete: Cascade)
   bien_the     bien_the  @relation(fields: [id_bien_the], references: [id])
 
+  danh_gia     danh_gia[]
+
  // Ràng buộc duy nhất: Mỗi đơn hàng ghi nhận một biến thể 1 lần duy nhất
   @@unique([id_don_hang, id_bien_the])
+}
+
+// Bảng Thanh Toán
+model thanh_toan {
+  id              String   @id @db.VarChar(8)
+  phuong_thuc     String   @db.VarChar(50)  // VNPAY, COD...
+  ma_giao_dich    String?  @db.VarChar(50)  // vnp_TransactionNo từ VNPAY
+  so_tien         Decimal  @db.Decimal(12, 2)
+  trang_thai      String   @db.VarChar(30)  // THANH_CONG, THAT_BAI...
+  ngay_thanh_toan DateTime @default(now())
+
+  // Khóa ngoại trỏ đến bảng don_hang
+  id_don_hang     String   @db.VarChar(8)
+  don_hang        don_hang @relation(fields: [id_don_hang], references: [id], onDelete: Cascade)
 }
 
 //Bảng Giỏ Hàng
@@ -464,6 +548,7 @@ model chi_tiet_gio_hang {
   @@unique([id_gio_hang, id_bien_the])
 }
 
+// Bảng Đợt Khuyến Mãi
 model dot_khuyen_mai {
   id            String   @id @db.VarChar(8)
   ten_dot       String   @db.VarChar(50)
@@ -474,6 +559,7 @@ model dot_khuyen_mai {
   chi_tiet_khuyen_mai chi_tiet_khuyen_mai[]
 }
 
+// Bảng Chi Tiết Khuyến Mãi
 model chi_tiet_khuyen_mai {
   id              String         @id @db.VarChar(8)
   id_dot_km       String         @db.VarChar(8)
@@ -487,4 +573,120 @@ model chi_tiet_khuyen_mai {
 
   // Ràng buộc duy nhất: Mỗi biến thể chỉ xuất hiện một lần trong một đợt khuyến mãi
   @@unique([id_dot_km, id_san_pham])
+}
+
+// Bảng Lịch Sử Trò Chuyện Tổng của Khách Hàng 
+model lich_su_tro_truyen {
+  id            String   @id @db.VarChar(8)
+  id_khach_hang String   @unique @db.VarChar(8) // @unique đảm bảo 1 Khách = 1 Lịch sử tổng
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  // Quan hệ khóa ngoại với Khách hàng
+  khach_hang khach_hang @relation(fields: [id_khach_hang], references: [id], onDelete: Cascade)
+
+  // Danh sách các cuộc trò chuyện / chủ đề bên trong hộp thư này
+  cuoc_tro_truyen cuoc_tro_truyen[]
+}
+
+// Bảng Cuộc Trò Chuyện / Chủ Đề 
+model cuoc_tro_truyen {
+  id                    String   @id @db.VarChar(8)
+  id_lich_su_tro_truyen String   @db.VarChar(8) // Liên kết trực tiếp vào Hộp thư tổng
+  id_san_pham           String?  @db.VarChar(8)
+  id_don_hang           String?  @db.VarChar(8)
+  tieu_de               String?  @db.VarChar(255)
+  created_at            DateTime @default(now())
+
+  // Quan hệ khóa ngoại
+  lich_su_tro_truyen lich_su_tro_truyen @relation(fields: [id_lich_su_tro_truyen], references: [id], onDelete: Cascade)
+  san_pham           san_pham?          @relation(fields: [id_san_pham], references: [id], onDelete: Cascade)
+  don_hang           don_hang?          @relation(fields: [id_don_hang], references: [id], onDelete: Cascade)
+
+  // Danh sách tin nhắn thuộc chủ đề này
+  tin_nhan tin_nhan[]
+}
+
+// Bảng Chi Tiết Tin Nhắn
+model tin_nhan {
+  id                 String   @id @db.VarChar(8)
+  id_cuoc_tro_truyen String   @db.VarChar(8)
+
+  // Khóa ngoại tách biệt cho Khách hàng và Nhân viên
+  id_khach_hang String? @db.VarChar(8)
+  id_nhan_vien  String? @db.VarChar(8)
+
+  vai_tro_nguoi_gui String   @db.VarChar(20) // 'customer', 'staff'
+  noi_dung          String   @db.Text
+  da_doc            Boolean  @default(false)
+  created_at        DateTime @default(now())
+
+  // Quan hệ khóa ngoại
+  cuoc_tro_truyen cuoc_tro_truyen @relation(fields: [id_cuoc_tro_truyen], references: [id], onDelete: Cascade)
+  khach_hang      khach_hang?     @relation(fields: [id_khach_hang], references: [id], onDelete: Cascade)
+  nhan_vien       nhan_vien?      @relation(fields: [id_nhan_vien], references: [id], onDelete: Cascade)
+}
+
+// Bảng Lịch Sử Xem
+model lich_su_xem {
+  id              String   @id @db.VarChar(8)
+  thoi_gian_xem   DateTime @default(now())
+
+  // Khóa ngoại bắt buộc nối tới SanPham
+  id_san_pham   String   @db.VarChar(8)
+  san_pham     san_pham  @relation(fields: [id_san_pham], references: [id], onDelete: Cascade)
+
+  // Khóa ngoại bắt buộc nối tới KhachHang
+  id_khach_hang String   @db.VarChar(8)
+  khach_hang    khach_hang @relation(fields: [id_khach_hang], references: [id], onDelete: Cascade)
+}
+
+// Bảng Lịch Sử Tìm Kiếm
+model lich_su_tim_kiem {
+  id          String   @id @db.VarChar(8)
+  
+  // Lưu mã thương hiệu (TH0001), mã thể loại (TL0001) hoặc từ khóa tìm kiếm
+  tu_khoa     String?         @db.VarChar(128)
+  gia_tu      Decimal?        @db.Decimal(15, 2)
+  gia_den     Decimal?        @db.Decimal(15, 2)
+
+  // Phân loại để Backend dễ nhận biết: "THUONGHIEU", "THELOAI", "NHACUNGCAP", "TUKHOA"
+  loai_tim_kiem      String   @default("TUKHOA") @db.VarChar(30) 
+  
+  thoi_gian_tim      DateTime @default(now())
+
+  // Khóa ngoại nối tới KhachHang
+  id_khach_hang String   @db.VarChar(8)
+  khach_hang   khach_hang @relation(fields: [id_khach_hang], references: [id], onDelete: Cascade)
+
+  @@index([id_khach_hang])
+  @@index([loai_tim_kiem])
+}
+
+// Bảng Phiên chat tư vấn AI (Mỗi khách hàng có thể có nhiều phiên tư vấn)
+model phien_chat_ai {
+  id             String          @id @db.VarChar(8)
+  id_khach_hang  String?         @db.VarChar(8) 
+  tieu_de        String?         @db.VarChar(100) @default("Cuộc trò chuyện mới")
+  ngay_tao       DateTime        @default(now())
+  ngay_cap_nhat  DateTime        @updatedAt
+
+  // Mối quan hệ khóa ngoại với bảng khach_hang
+  khach_hang     khach_hang?     @relation(fields: [id_khach_hang], references: [id], onDelete: Cascade)
+
+  // Quan hệ 1-N: Một phiên chat có nhiều tin nhắn
+  tin_nhan_chat_ai  tin_nhan_chat_ai[]
+}
+
+// Bảng Chi tiết tin nhắn trong phiên chat AI
+model tin_nhan_chat_ai {
+  id                Int         @id @default(autoincrement()) 
+  id_phien_chat_ai  String      @db.VarChar(8)
+  vai_tro           String      @db.VarChar(20) // Lưu giá trị: "user" hoặc "assistant"
+  noi_dung          String      @db.Text
+  san_pham_goi_y    Json?       // Lưu mảng metadata các biến thể laptop AI đã gợi ý (sources) để hiển thị Card khi tải lại lịch sử
+  thoi_gian_gui     DateTime    @default(now())
+
+  // Mối quan hệ khóa ngoại với bảng phien_chat
+  phien_chat_ai     phien_chat_ai  @relation(fields: [id_phien_chat_ai], references: [id], onDelete: Cascade)
 }

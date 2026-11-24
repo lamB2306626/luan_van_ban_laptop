@@ -5,7 +5,11 @@
       <h5 class="mb-0 text-secondary">
         <i class="fas fa-tags me-2"></i>Danh Sách Sản Phẩm Áp Dụng Khuyến Mãi
       </h5>
-      <button class="btn btn-success btn-sm" @click="openAddModal">
+      <button
+        class="btn btn-success btn-sm"
+        :class="{ 'btn-permission-muted': !canManageDotKhuyenMai }"
+        @click="openAddModal"
+      >
         <i class="fas fa-plus me-1"></i> Thêm Sản Phẩm Khuyến Mãi
       </button>
     </div>
@@ -27,6 +31,7 @@
     <!-- Bảng danh sách chi tiết khuyến mãi -->
     <ChiTietKhuyenMaiTable
       :dsChiTiet="dsChiTiet"
+      :canManageDotKhuyenMai="canManageDotKhuyenMai"
       @edit:chiTiet="openEditModal"
       @delete:chiTiet="handleDelete"
     />
@@ -58,6 +63,7 @@
           <div class="modal-body">
             <ChiTietKhuyenMaiForm
               v-if="showForm"
+              :dsIdSanPhamDaApDung="existingProductIds"
               :chiTiet="selectedChiTiet"
               :isEdit="isEdit"
               @submit:chiTiet="handleSave"
@@ -85,6 +91,10 @@ export default {
   },
   props: {
     idDotKm: { type: String, required: true }, // Mã đợt khuyến mãi cha
+    canManageDotKhuyenMai: {
+      type: Boolean,
+      default: false, // người dùng hiện tại có quyền thêm/sửa sản phẩm hay không
+    },
   },
   data() {
     return {
@@ -96,7 +106,25 @@ export default {
       modalInstance: null,
     };
   },
+  computed: {
+    // Tự động quét mảng chi tiết hiện có để gom ra danh sách các ID sản phẩm đã được thêm vào đợt KM này
+    // sau đó truyền vào form thêm mới chi tiết khuyến mãi để form này disable các sản phẩm đã chọn tránh chọn lại sản phẩm
+    existingProductIds() {
+      if (!Array.isArray(this.dsChiTiet)) return [];
+      // Giả sử mỗi item trong dsChiTiet có chứa id_san_pham
+      return this.dsChiTiet.map((item) => item.id_san_pham);
+    },
+  },
   methods: {
+    // ==================== Phát tín hiệu không có quyền thực hiện thao tác ====================
+    notifyAccessDenied(message = "Bạn không có quyền thực hiện thao tác này!") {
+      window.dispatchEvent(
+        new CustomEvent("admin-access-denied", {
+          detail: { message },
+        }),
+      );
+    },
+
     // Lấy danh sách chi tiết khuyến mãi theo idDotKm
     async fetchChiTietList() {
       try {
@@ -112,11 +140,16 @@ export default {
 
     // Mở Modal Thêm mới
     openAddModal() {
+      if (!this.canManageDotKhuyenMai) {
+        this.notifyAccessDenied();
+        return;
+      }
+
       this.isEdit = false;
       this.selectedChiTiet = {
         id_dot_km: this.idDotKm,
-        id_san_pham: "",
-        loai_giam_gia: "PERCENT", // Hoặc 'FIXED' tùy định dạng hệ thống của bạn
+        danh_sach_id_san_pham: [],
+        loai_giam_gia: "PHAN_TRAM", // Hoặc 'FIXED' tùy định dạng hệ thống của bạn
         gia_tri_giam: 0,
       };
       this.showForm = true;
@@ -174,9 +207,7 @@ export default {
 
     // Xóa sản phẩm khỏi đợt khuyến mãi
     async handleDelete(chiTiet) {
-      if (
-        confirm(`Bạn có chắc muốn xóa sản phẩm này khỏi đợt khuyến mãi?`)
-      ) {
+      if (confirm(`Bạn có chắc muốn xóa sản phẩm này khỏi đợt khuyến mãi?`)) {
         try {
           await ChiTietKhuyenMaiService.delete(chiTiet.id);
           this.message = "Đã xóa thành công!";
@@ -194,3 +225,14 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+.btn-permission-muted {
+  opacity: 0.45;
+  cursor: pointer;
+}
+
+.btn-permission-muted:hover {
+  opacity: 0.65;
+}
+</style>

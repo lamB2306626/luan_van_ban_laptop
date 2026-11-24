@@ -5,7 +5,10 @@ const router = express.Router();
 
 router.route("/checkout").post(donHang.checkout);
 router.route("/preview").post(donHang.previewCheckout);
-router.patch("/:id/cancel", donHang.cancel);
+router.patch("/:id/approve", donHang.approve);
+router.patch("/:id/cancel-by-nv", donHang.cancelByNhanVien);
+router.patch("/:id/cancel-by-kh", donHang.cancelByKhachHang);
+router.patch("/:id/updateSLTTandNgayDat", donHang.updateSLTTandNgayDat);
 
 router
   .route("/")

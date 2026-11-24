@@ -3,32 +3,15 @@ const ApiError = require("../api-error");
 
 // ============================== 1. Thêm Chi Tiết Khuyến Mãi mới ==================================
 exports.create = async (req, res, next) => {
-  const {
-    id_dot_km,
-    id_san_pham,
-    danh_sach_id_san_pham,
-    loai_giam_gia,
-    gia_tri_giam,
-  } = req.body;
+  const { id_dot_km, ds_chi_tiet } = req.body;
 
-  // Validate các trường cơ bản bắt buộc
-  if (!id_dot_km || !loai_giam_gia || gia_tri_giam === undefined) {
+  // Validate cơ bản: Phải có mã đợt và mảng chi tiết sản phẩm
+  if (!id_dot_km || !Array.isArray(ds_chi_tiet) || ds_chi_tiet.length === 0) {
     return next(
       new ApiError(
         400,
-        "Vui lòng nhập đầy đủ: id_dot_km, loai_giam_gia, gia_tri_giam",
+        "Vui lòng cung cấp id_dot_km và danh sách chi tiết sản phẩm khuyến mãi",
       ),
-    );
-  }
-
-  // Validate ít nhất phải có 1 trong 2: id_san_pham lẻ hoặc danh_sach_id_san_pham
-  if (
-    !id_san_pham &&
-    (!Array.isArray(danh_sach_id_san_pham) ||
-      danh_sach_id_san_pham.length === 0)
-  ) {
-    return next(
-      new ApiError(400, "Phải cung cấp id_san_pham hoặc danh_sach_id_san_pham"),
     );
   }
 
@@ -99,7 +82,12 @@ exports.findAll = async (req, res, next) => {
 // ============================== 3. Cập nhật Chi Tiết Khuyến Mãi theo id ==================================
 exports.update = async (req, res, next) => {
   if (Object.keys(req.body).length === 0) {
-    return next(new ApiError(400, "Dữ liệu cập nhật không được để trống"));
+    return next(
+      new ApiError(
+        400,
+        "Dữ liệu cập nhật không được để trống không được để trống",
+      ),
+    );
   }
 
   try {

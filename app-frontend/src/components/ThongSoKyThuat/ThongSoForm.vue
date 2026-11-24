@@ -1,7 +1,7 @@
 <template>
   <Form @submit="submitThongSo" :validation-schema="thongSoFormSchema">
     <!-- Mã Thông Số & Mã Sản Phẩm: Chỉ hiển thị disabled khi Edit/Coid -->
-    <div v-if="isEdit" class="row">
+    <!-- <div v-if="isEdit" class="row">
       <div class="col-md-6 form-group mb-3">
         <label for="id">Mã Thông Số:</label>
         <Field
@@ -25,30 +25,34 @@
         />
         <ErrorMessage name="id_san_pham" class="text-danger small" />
       </div>
-    </div>
+    </div> -->
 
     <!-- Màn hình & Độ phân giải -->
     <div class="row">
       <div class="col-md-6 form-group mb-3">
-        <label for="kich_thuoc_man_hinh">Kích thước màn hình <span class="text-danger">*</span>:</label>
+        <label for="kich_thuoc_man_hinh">Kích thước màn hình:</label>
         <Field
           name="kich_thuoc_man_hinh"
           type="text"
           class="form-control"
           v-model="thongSoLocal.kich_thuoc_man_hinh"
           placeholder="VD: 15.6 inch, OLED, 120Hz..."
+          @input="emitChange"
+          :disabled="!canManageSanPham"
         />
         <ErrorMessage name="kich_thuoc_man_hinh" class="text-danger small" />
       </div>
 
       <div class="col-md-6 form-group mb-3">
-        <label for="do_phan_giai">Độ phân giải <span class="text-danger">*</span>:</label>
+        <label for="do_phan_giai">Độ phân giải:</label>
         <Field
           name="do_phan_giai"
           type="text"
           class="form-control"
           v-model="thongSoLocal.do_phan_giai"
           placeholder="VD: FHD (1920 x 1080)..."
+          @input="emitChange"
+          :disabled="!canManageSanPham"
         />
         <ErrorMessage name="do_phan_giai" class="text-danger small" />
       </div>
@@ -57,25 +61,29 @@
     <!-- Pin & Công suất sạc -->
     <div class="row">
       <div class="col-md-6 form-group mb-3">
-        <label for="dung_luong_pin">Dung lượng pin <span class="text-danger">*</span>:</label>
+        <label for="dung_luong_pin">Dung lượng pin:</label>
         <Field
           name="dung_luong_pin"
           type="text"
           class="form-control"
           v-model="thongSoLocal.dung_luong_pin"
           placeholder="VD: 4-cell, 70Wh..."
+          @input="emitChange"
+          :disabled="!canManageSanPham"
         />
         <ErrorMessage name="dung_luong_pin" class="text-danger small" />
       </div>
 
       <div class="col-md-6 form-group mb-3">
-        <label for="cong_xuat_sac">Công suất sạc <span class="text-danger">*</span>:</label>
+        <label for="cong_xuat_sac">Công suất sạc:</label>
         <Field
           name="cong_xuat_sac"
           type="text"
           class="form-control"
           v-model="thongSoLocal.cong_xuat_sac"
           placeholder="VD: Type-C 100W, 200W Adapter..."
+          @input="emitChange"
+          :disabled="!canManageSanPham"
         />
         <ErrorMessage name="cong_xuat_sac" class="text-danger small" />
       </div>
@@ -84,25 +92,29 @@
     <!-- Cổng kết nối & Wifi/Bluetooth -->
     <div class="row">
       <div class="col-md-6 form-group mb-3">
-        <label for="cong_ket_noi">Cổng kết nối <span class="text-danger">*</span>:</label>
+        <label for="cong_ket_noi">Cổng kết nối:</label>
         <Field
           name="cong_ket_noi"
           type="text"
           class="form-control"
           v-model="thongSoLocal.cong_ket_noi"
           placeholder="VD: 1x USB-C, 2x USB-A, 1x HDMI..."
+          @input="emitChange"
+          :disabled="!canManageSanPham"
         />
         <ErrorMessage name="cong_ket_noi" class="text-danger small" />
       </div>
 
       <div class="col-md-6 form-group mb-3">
-        <label for="chuan_wifi_bluetooth">Chuẩn Wi-Fi / Bluetooth <span class="text-danger">*</span>:</label>
+        <label for="chuan_wifi_bluetooth">Chuẩn Wi-Fi / Bluetooth:</label>
         <Field
           name="chuan_wifi_bluetooth"
           type="text"
           class="form-control"
           v-model="thongSoLocal.chuan_wifi_bluetooth"
           placeholder="VD: Wi-Fi 6E (802.11ax) + Bluetooth 5.3..."
+          @input="emitChange"
+          :disabled="!canManageSanPham"
         />
         <ErrorMessage name="chuan_wifi_bluetooth" class="text-danger small" />
       </div>
@@ -111,25 +123,29 @@
     <!-- Trọng lượng & Chất liệu vỏ -->
     <div class="row">
       <div class="col-md-6 form-group mb-3">
-        <label for="trong_luong">Trọng lượng <span class="text-danger">*</span>:</label>
+        <label for="trong_luong">Trọng lượng:</label>
         <Field
           name="trong_luong"
           type="text"
           class="form-control"
           v-model="thongSoLocal.trong_luong"
           placeholder="VD: 1.8 kg..."
+          @input="emitChange"
+          :disabled="!canManageSanPham"
         />
         <ErrorMessage name="trong_luong" class="text-danger small" />
       </div>
 
       <div class="col-md-6 form-group mb-3">
-        <label for="chat_lieu_vo">Chất liệu vỏ <span class="text-danger">*</span>:</label>
+        <label for="chat_lieu_vo">Chất liệu vỏ:</label>
         <Field
           name="chat_lieu_vo"
           type="text"
           class="form-control"
           v-model="thongSoLocal.chat_lieu_vo"
           placeholder="VD: Vỏ nhôm nguyên khối, Vỏ nhựa..."
+          @input="emitChange"
+          :disabled="!canManageSanPham"
         />
         <ErrorMessage name="chat_lieu_vo" class="text-danger small" />
       </div>
@@ -137,20 +153,25 @@
 
     <!-- Hệ điều hành -->
     <div class="form-group mb-3">
-      <label for="he_dieu_hanh">Hệ điều hành <span class="text-danger">*</span>:</label>
+      <label for="he_dieu_hanh">Hệ điều hành:</label>
       <Field
         name="he_dieu_hanh"
         type="text"
         class="form-control"
         v-model="thongSoLocal.he_dieu_hanh"
         placeholder="VD: Windows 11 Home..."
+        @input="emitChange"
+        :disabled="!canManageSanPham"
       />
       <ErrorMessage name="he_dieu_hanh" class="text-danger small" />
     </div>
 
     <!-- Các nút hành động -->
-    <div class="form-group mt-4">
-      <button class="btn btn-primary">
+    <div v-if="showSubmitButton" class="form-group mt-4">
+      <button
+        class="btn btn-primary"
+        :class="{ 'btn-permission-muted': !canManageSanPham }"
+      >
         <i class="fas fa-save"></i> Lưu thông số
       </button>
     </div>
@@ -184,8 +205,17 @@ export default {
       }),
     },
     isEdit: { type: Boolean, default: false },
+    canManageSanPham: {
+      type: Boolean,
+      default: false, // người dùng hiện tại có quyền thêm/sửa sản phẩm hay không
+    },
+    // Điều khiển ẩn/hiện nút submit để khi dùng component này trong trang thêm sản phẩm thì bỏ nút lưu ra cho đẹp
+    showSubmitButton: {
+      type: Boolean,
+      default: true,
+    },
   },
-  emits: ["submit:thongSo", "cancel"],
+  emits: ["update:thongSo", "submit:thongSo", "cancel"],
   data() {
     // Validation schema ứng với độ dài giới hạn trong database Prisma
     const thongSoFormSchema = yup.object().shape({
@@ -193,6 +223,7 @@ export default {
         .string()
         .required("Kích thước màn hình không được để trống.")
         .max(30, "Tối đa 30 ký tự."),
+
       do_phan_giai: yup
         .string()
         .required("Độ phân giải không được để trống.")
@@ -211,11 +242,11 @@ export default {
         .max(128, "Tối đa 128 ký tự."),
       chuan_wifi_bluetooth: yup
         .string()
-        .required("Chuẩn wifi, bluetooth không được để trống.")
+        .required("Chuẩn Wifi-Bluetooth không được để trống.")
         .max(64, "Tối đa 64 ký tự."),
       trong_luong: yup
         .string()
-        .required("Trọng Lượng không được để trống.")
+        .required("Trọng lượng không được để trống.")
         .max(20, "Tối đa 20 ký tự."),
       chat_lieu_vo: yup
         .string()
@@ -241,7 +272,27 @@ export default {
     },
   },
   methods: {
+    // ==================== Phát tín hiệu không có quyền thực hiện thao tác ====================
+    notifyAccessDenied(message = "Bạn không có quyền thực hiện thao tác này!") {
+      window.dispatchEvent(
+        new CustomEvent("admin-access-denied", {
+          detail: { message },
+        }),
+      );
+    },
+
+    emitChange() {
+      this.$nextTick(() => {
+        this.$emit("update:thongSo", this.thongSoLocal);
+      });
+    },
+
     submitThongSo() {
+      if (!this.canManageSanPham) {
+        this.notifyAccessDenied();
+        return;
+      }
+
       this.$emit("submit:thongSo", this.thongSoLocal);
     },
     cancel() {
@@ -250,3 +301,14 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+.btn-permission-muted {
+  opacity: 0.45;
+  cursor: pointer;
+}
+
+.btn-permission-muted:hover {
+  opacity: 0.65;
+}
+</style>

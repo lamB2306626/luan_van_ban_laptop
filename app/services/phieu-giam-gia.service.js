@@ -1,5 +1,4 @@
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+const prisma = require("../utils/prisma");
 
 class PhieuGiamGiaService {
   // Lọc lấy các trường thuộc tính hợp lệ của Phiếu Giảm Giá
@@ -45,11 +44,11 @@ class PhieuGiamGiaService {
       });
 
       if (!lastPhieu) {
-        payload.id = "PGG01";
+        payload.id = "PGG0001";
       } else {
         const currentNumber =
           parseInt(lastPhieu.id.replace(/\D/g, ""), 10) || 0;
-        payload.id = `PGG${String(currentNumber + 1).padStart(2, "0")}`;
+        payload.id = `PGG${String(currentNumber + 1).padStart(4, "0")}`;
       }
     }
 

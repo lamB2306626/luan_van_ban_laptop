@@ -1,8 +1,17 @@
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+const prisma = require("../utils/prisma");
+const bcrypt = require("bcrypt");
 
 const PhieuKhachHangService = require("./phieu-khach-hang.service");
 const phieuKhachHangService = new PhieuKhachHangService();
+
+const path = require("path");
+const fs = require("fs");
+const axios = require("axios");
+const { OAuth2Client } = require("google-auth-library");
+
+const client = new OAuth2Client(
+  "123250462571-d7bggil4n0be4kpp5pkgcor11mssntgc.apps.googleusercontent.com",
+);
 
 class KhachHangService {
   // Trích xuất và định dạng dữ liệu đầu vào
@@ -14,6 +23,7 @@ class KhachHangService {
       mat_khau: payload.mat_khau,
       so_dien_thoai: payload.so_dien_thoai,
       ngay_sinh: payload.ngay_sinh ? new Date(payload.ngay_sinh) : undefined,
+      avatar: payload.avatar,
       trang_thai:
         payload.trang_thai !== undefined
           ? Boolean(payload.trang_thai)
@@ -195,25 +205,32 @@ class KhachHangService {
   }
 
   // ==================== 1. Tạo Khách Hàng mới ====================
-  async create(payload) {
+  async create(payload, tx) {
+    const db = tx || prisma;
     if (!payload.id) {
-      const lastKhachHang = await prisma.khach_hang.findFirst({
+      const lastKhachHang = await db.khach_hang.findFirst({
         orderBy: { id: "desc" },
       });
 
       if (!lastKhachHang) {
-        payload.id = "KH01";
+        payload.id = "KH0001";
       } else {
         const currentNumber =
           parseInt(lastKhachHang.id.replace(/\D/g, ""), 10) || 0;
-        payload.id = `KH${String(currentNumber + 1).padStart(2, "0")}`;
+        payload.id = `KH${String(currentNumber + 1).padStart(4, "0")}`;
       }
     }
 
     const data = this.extractKhachHangData(payload);
 
+    // MÃ HÓA MẬT KHẨU NẾU CÓ
+    if (data.mat_khau) {
+      const salt = await bcrypt.genSalt(10);
+      data.mat_khau = await bcrypt.hash(data.mat_khau, salt);
+    }
+
     try {
-      return await prisma.khach_hang.create({
+      return await db.khach_hang.create({
         data: data,
         include: { hang_thanh_vien: true },
       });
@@ -326,6 +343,216 @@ class KhachHangService {
       where: { id: id },
       include: { hang_thanh_vien: true },
     });
+  }
+
+  // ==================== Đăng nhập tài khoản khách hàng ======================
+  async login(email, mat_khau) {
+    // Tìm nhân viên theo email kèm theo thông tin vai trò (role)
+    const khachHang = await prisma.khach_hang.findUnique({
+      where: { email: email },
+    });
+
+    if (!khachHang) {
+      return null;
+    }
+
+    // So sánh mật khẩu
+    const isMatch = await bcrypt.compare(mat_khau, khachHang.mat_khau);
+    if (!isMatch) return null;
+
+    return khachHang;
+  }
+
+  // ==================== Đăng nhập tài khoản GOOGLE ======================
+  async loginWithGoogle(googleToken) {
+    // 1. Xác thực ID Token với Google
+    const ticket = await client.verifyIdToken({
+      idToken: googleToken,
+      audience:
+        "123250462571-d7bggil4n0be4kpp5pkgcor11mssntgc.apps.googleusercontent.com",
+    });
+
+    const payload = ticket.getPayload();
+    const {
+      sub: providerid,
+      email,
+      name: hoten,
+      picture: googleImageUrl,
+    } = payload;
+
+    // 2. Tìm khách hàng trong DB (Theo providerid HOẶC email)
+    let user = await prisma.khach_hang.findFirst({
+      where: {
+        OR: [{ providerid: providerid }, { email: email }],
+      },
+    });
+
+    // 3. Nếu chưa tồn tại -> Tải avatar & Tái sử dụng hàm this.create() để tạo tài khoản mới
+    if (!user) {
+      let savedAvatarFileName = null;
+      if (googleImageUrl) {
+        const fileName = `kh_${Date.now().toString().slice(-8)}.jpg`;
+        savedAvatarFileName = await this.saveSocialAvatar(
+          googleImageUrl,
+          fileName,
+        );
+      }
+
+      // Gọi lại hàm this.create() -> Tự động sinh ID tăng dần (KH01, KH02...)
+      user = await this.create({
+        ho_ten: hoten,
+        email: email,
+        avatar: savedAvatarFileName,
+        provider: "google",
+        providerid: providerid,
+        trang_thai: true,
+        tong_chi_tieu: 0,
+      });
+    } else if (!user.providerid) {
+      // 4. Trường hợp tài khoản đã tồn tại (đã đăng ký bằng Email thường trước đó)
+      // Cập nhật thông tin Google Provider và bổ sung Avatar nếu chưa có
+      let savedAvatarFileName = user.avatar;
+      if (!savedAvatarFileName && googleImageUrl) {
+        const fileName = `kh_${Date.now().toString().slice(-8)}.jpg`;
+        savedAvatarFileName = await this.saveSocialAvatar(
+          googleImageUrl,
+          fileName,
+        );
+      }
+
+      user = await prisma.khach_hang.update({
+        where: { id: user.id },
+        data: {
+          provider: "google",
+          providerid: providerid,
+          avatar: savedAvatarFileName,
+        },
+      });
+    }
+
+    // 5. Kiểm tra trạng thái tài khoản (trang_thai kiểu Boolean: false = Khóa)
+    if (!user.trang_thai) {
+      throw new Error("TAI_KHOAN_BI_KHOA");
+    }
+
+    return user;
+  }
+
+  // ==================== Đăng nhập tài khoản FACEBOOK ======================
+  async loginWithFacebook(facebookToken) {
+    // 1. Gọi Graph API của Facebook để lấy thông tin người dùng
+    let fbRes;
+    try {
+      fbRes = await axios.get("https://graph.facebook.com/v19.0/me", {
+        params: {
+          fields: "id,name,email,picture.type(large)",
+          access_token: facebookToken,
+        },
+      });
+    } catch (err) {
+      console.error(
+        "Lỗi Graph API Facebook:",
+        err.response?.data || err.message,
+      );
+      throw new Error("XAC_THUC_FACEBOOK_THAT_BAI");
+    }
+
+    const { id: providerid, name: hoten, picture } = fbRes.data;
+    const fbImageUrl = picture?.data?.url || null;
+
+    // Xử lý trường hợp Facebook không trả về email (đăng ký FB bằng SĐT)
+    const email = fbRes.data.email || `${providerid}@facebook.com`;
+
+    // 2. Tìm khách hàng trong DB (Theo providerid HOẶC email)
+    let user = await prisma.khach_hang.findFirst({
+      where: {
+        OR: [{ providerid: providerid }, { email: email }],
+      },
+    });
+
+    // 3. Nếu chưa tồn tại -> Tải avatar & Tái sử dụng hàm this.create() để tạo tài khoản mới
+    if (!user) {
+      let savedAvatarFileName = null;
+      if (fbImageUrl) {
+        const fileName = `fb_${Date.now().toString().slice(-8)}.jpg`;
+        savedAvatarFileName = await this.saveSocialAvatar(fbImageUrl, fileName);
+      }
+
+      // Gọi lại hàm this.create() -> Tự động sinh ID tăng dần (KH01, KH02...)
+      user = await this.create({
+        ho_ten: hoten,
+        email: email,
+        avatar: savedAvatarFileName,
+        provider: "facebook",
+        providerid: providerid,
+        trang_thai: true,
+        tong_chi_tieu: 0,
+      });
+    } else if (!user.providerid) {
+      // 4. Trường hợp tài khoản đã tồn tại (đã đăng ký bằng Email thường trước đó)
+      // Cập nhật thông tin Facebook Provider và bổ sung Avatar nếu chưa có
+      let savedAvatarFileName = user.avatar;
+      if (!savedAvatarFileName && fbImageUrl) {
+        const fileName = `fb_${Date.now().toString().slice(-8)}.jpg`;
+        savedAvatarFileName = await this.saveSocialAvatar(fbImageUrl, fileName);
+      }
+
+      user = await prisma.khach_hang.update({
+        where: { id: user.id },
+        data: {
+          provider: "facebook",
+          providerid: providerid,
+          avatar: savedAvatarFileName,
+        },
+      });
+    }
+
+    // 5. Kiểm tra trạng thái tài khoản (trang_thai kiểu Boolean: false = Khóa)
+    if (!user.trang_thai) {
+      throw new Error("TAI_KHOAN_BI_KHOA");
+    }
+
+    return user;
+  }
+
+  // ==================== Tải và Lưu Ảnh từ Google ======================
+  async saveSocialAvatar(imageUrl, filename) {
+    try {
+      // process.cwd() lấy thư mục gốc dự án Node.js
+      const uploadDir = path.join(process.cwd(), "public/uploads/KhachHang");
+
+      // Tự động tạo thư mục nếu chưa có
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+
+      const filePath = path.join(uploadDir, filename);
+
+      // Tải ảnh stream từ Google
+      const response = await axios({
+        url: imageUrl,
+        method: "GET",
+        responseType: "stream",
+      });
+
+      return new Promise((resolve, reject) => {
+        const writer = fs.createWriteStream(filePath);
+        response.data.pipe(writer);
+
+        writer.on("finish", () => {
+          // Trả về tên file ngắn gọn để lưu vào DB (khớp với VarChar(30))
+          resolve(filename);
+        });
+
+        writer.on("error", (err) => {
+          console.error("❌ Lỗi khi ghi file ảnh:", err);
+          resolve(null);
+        });
+      });
+    } catch (error) {
+      console.error("❌ Lỗi khi tải Google Avatar:", error.message);
+      return null;
+    }
   }
 }
 

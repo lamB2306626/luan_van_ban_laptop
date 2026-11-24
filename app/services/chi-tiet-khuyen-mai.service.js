@@ -1,5 +1,4 @@
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+const prisma = require("../utils/prisma");
 
 class ChiTietKhuyenMaiService {
   // Lọc lấy các trường thuộc tính hợp lệ
@@ -20,91 +19,80 @@ class ChiTietKhuyenMaiService {
     return chiTiet;
   }
 
-  // 1. Thêm chi tiết khuyến mãi mới (Tự sinh mã CTKM01, CTKM02...)
-  async create(payload, tx) {
-    const db = tx || prisma;
-    // Trường hợp 1: Thêm hàng loạt sản phẩm vào đợt khuyến mãi
-    if (
-      Array.isArray(payload.danh_sach_id_san_pham) &&
-      payload.danh_sach_id_san_pham.length > 0
-    ) {
-      const executeBatch = async (transactionClient) => {
-        const lastRecord =
-          await transactionClient.chi_tiet_khuyen_mai.findFirst({
-            orderBy: { id: "desc" },
-          });
+  async create(payload, externalTx = null) {
+    const execute = async (tx) => {
+      let items = [];
+      if (Array.isArray(payload)) {
+        items = payload;
+      } else if (payload && Array.isArray(payload.ds_chi_tiet)) {
+        items = payload.ds_chi_tiet;
+      } else {
+        items = [payload];
+      }
 
-        let startNum = lastRecord
-          ? parseInt(lastRecord.id.replace(/\D/g, ""), 10) || 0
-          : 0;
+      if (items.length === 0) return [];
 
-        const records = payload.danh_sach_id_san_pham.map((idSanPham) => {
-          startNum += 1;
-          return {
-            id: `CTKM${String(startNum).padStart(2, "0")}`,
-            id_dot_km: payload.id_dot_km,
-            id_san_pham: idSanPham,
-            loai_giam_gia: payload.loai_giam_gia,
-            gia_tri_giam: Number(payload.gia_tri_giam),
-          };
+      const results = [];
+
+      try {
+        const lastChiTiet = await tx.chi_tiet_khuyen_mai.findFirst({
+          orderBy: { id: "desc" },
         });
 
-        try {
-          const result = await transactionClient.chi_tiet_khuyen_mai.createMany(
-            {
-              data: records,
-            },
-          );
+        let currentNumber = lastChiTiet
+          ? parseInt(lastChiTiet.id.replace(/\D/g, ""), 10) || 0
+          : 0;
 
-          return {
-            totalCreated: result.count,
+        for (const item of items) {
+          if (!item.id || item.id.startsWith("CT_TEMP_")) {
+            currentNumber += 1;
+            item.id = `CTKM${String(currentNumber).padStart(4, "0")}`;
+          }
+
+          const cleanData = {
+            id: item.id,
+            id_dot_km: item.id_dot_km || payload.id_dot_km,
+            id_san_pham: item.id_san_pham,
+            loai_giam_gia: item.loai_giam_gia,
+            gia_tri_giam: Number(item.gia_tri_giam),
           };
-        } catch (error) {
-          if (error.code === "P2003") {
-            throw new Error("DOT_KHUYEN_MAI_HOAC_SAN_PHAM_KHONG_TON_TAI");
-          }
-          if (error.code === "P2002") {
-            throw new Error("SAN_PHAM_DA_CO_TRONG_DOT_KHUYEN_MAI");
-          }
-          throw error;
+
+          const newDetail = await tx.chi_tiet_khuyen_mai.create({
+            data: cleanData,
+          });
+
+          results.push(newDetail);
         }
-      };
 
-      // Nếu có tx truyền từ ngoài thì dùng luôn, không thì tự tạo $transaction
-      return tx
-        ? await executeBatch(tx)
-        : await prisma.$transaction(executeBatch);
-    }
+        return Array.isArray(payload)
+          ? results
+          : payload.ds_chi_tiet
+            ? results
+            : results[0];
+      } catch (error) {
+        // 🌟 BẪY LỖI PRISMA TẠI ĐÂY ĐỂ TRUYỀN VỀ CONTROLLER
 
-    // Trường hợp 2: Thêm 1 sản phẩm cụ thể
-    if (!payload.id) {
-      const lastChiTiet = await db.chi_tiet_khuyen_mai.findFirst({
-        orderBy: { id: "desc" },
-      });
-      const currentNumber = lastChiTiet
-        ? parseInt(lastChiTiet.id.replace(/\D/g, ""), 10) || 0
-        : 0;
-      payload.id = `CTKM${String(currentNumber + 1).padStart(2, "0")}`;
-    }
+        // Mã P2003: Khóa ngoại không tồn tại (Sai id_dot_km hoặc id_san_pham)
+        if (error.code === "P2003") {
+          throw new Error("DOT_KHUYEN_MAI_HOAC_SAN_PHAM_KHONG_TON_TAI");
+        }
 
-    const data = this.extractChiTietKMData(payload);
+        // Mã P2002: Vi phạm ràng buộc Unique (Trùng lặp cặp [id_dot_km, id_san_pham])
+        if (error.code === "P2002") {
+          throw new Error("SAN_PHAM_DA_CO_TRONG_DOT_KHUYEN_MAI");
+        }
 
-    try {
-      return await db.chi_tiet_khuyen_mai.create({
-        data: data,
-        include: {
-          dot_khuyen_mai: true,
-          san_pham: true,
-        },
-      });
-    } catch (error) {
-      if (error.code === "P2003") {
-        throw new Error("DOT_KHUYEN_MAI_HOAC_SAN_PHAM_KHONG_TON_TAI");
+        // Ném lại các lỗi khác nếu có
+        throw error;
       }
-      if (error.code === "P2002") {
-        throw new Error("SAN_PHAM_DA_CO_TRONG_DOT_KHUYEN_MAI");
-      }
-      throw error;
+    };
+
+    if (externalTx) {
+      return await execute(externalTx);
+    } else {
+      return await prisma.$transaction(async (tx) => {
+        return await execute(tx);
+      });
     }
   }
 
@@ -184,6 +172,7 @@ class ChiTietKhuyenMaiService {
     const result = await db.chi_tiet_khuyen_mai.deleteMany({
       where: { id_dot_km: id_dot_km },
     });
+
     return result.count;
   }
 

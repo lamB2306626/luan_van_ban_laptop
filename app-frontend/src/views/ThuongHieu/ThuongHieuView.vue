@@ -5,11 +5,19 @@
     <!-- Component Tìm kiếm Thương hiệu -->
     <ThuongHieuSearch v-model="filter" @submit="retrieveThuongHieus" />
 
-    <button class="btn btn-primary mb-3" @click="goToAddThuongHieu">
+    <button
+      class="btn btn-primary mb-3"
+      :class="{ 'btn-permission-muted': !canManageThuongHieu }"
+      @click="goToAddThuongHieu"
+    >
       <i class="fas fa-plus"></i> Thêm mới Thương Hiệu
     </button>
 
-    <button class="btn btn-danger mb-3 ms-2" @click="deleteAllThuongHieus">
+    <button
+      class="btn btn-danger mb-3 ms-2"
+      :class="{ 'btn-permission-muted': !canManageThuongHieu }"
+      @click="deleteAllThuongHieus"
+    >
       <i class="fas fa-trash"></i> Xóa tất cả Thương Hiệu
     </button>
 
@@ -41,6 +49,7 @@
           <td>
             <button
               class="btn btn-sm btn-secondary me-2"
+              :class="{ 'btn-permission-muted': !canManageThuongHieu }"
               @click="goToUpdateThuongHieu(thuongHieu.id)"
             >
               <i class="fas fa-edit"></i> Cập nhật
@@ -48,6 +57,7 @@
 
             <button
               class="btn btn-sm btn-danger"
+              :class="{ 'btn-permission-muted': !canManageThuongHieu }"
               @click="deleteThuongHieu(thuongHieu.id)"
             >
               <i class="fas fa-trash"></i> Xóa
@@ -71,6 +81,8 @@ import ThuongHieuSearch from "@/components/ThuongHieu/ThuongHieuSearch.vue";
 import ThuongHieuService from "@/services/thuong-hieu.service";
 const API_URL = import.meta.env.VITE_API_BASE_URL;
 
+const ALLOWED_THUONG_HIEU_ROLES = ["Nhân viên kho", "Quản trị viên"];
+
 export default {
   name: "ThuongHieuView",
   components: {
@@ -87,7 +99,38 @@ export default {
     };
   },
 
+  computed: {
+    currentAdminUser() {
+      try {
+        const userStr = localStorage.getItem("adminUser");
+        return userStr ? JSON.parse(userStr) : null;
+      } catch (e) {
+        return null;
+      }
+    },
+
+    adminRole() {
+      if (!this.currentAdminUser) return null;
+      return this.currentAdminUser.vai_tro.ten_vai_tro;
+    },
+
+    canManageThuongHieu() {
+      return (
+        !!this.adminRole && ALLOWED_THUONG_HIEU_ROLES.includes(this.adminRole)
+      );
+    },
+  },
+
   methods: {
+    // ==================== Phát tín hiệu không có quyền thực hiện thao tác ====================
+    notifyAccessDenied(message = "Bạn không có quyền thực hiện thao tác này!") {
+      window.dispatchEvent(
+        new CustomEvent("admin-access-denied", {
+          detail: { message },
+        }),
+      );
+    },
+
     // ==================== 1. Lấy danh sách Thương Hiệu theo bộ lọc ====================
     async retrieveThuongHieus() {
       try {
@@ -99,11 +142,19 @@ export default {
 
     // ==================== 2. Điều hướng tới Form Thêm Mới ====================
     goToAddThuongHieu() {
+      if (!this.canManageThuongHieu) {
+        this.notifyAccessDenied();
+        return;
+      }
       this.$router.push({ name: "thuong-hieu.add" });
     },
 
     // ==================== 3. Điều hướng tới Form Cập Nhật ====================
     goToUpdateThuongHieu(id) {
+      if (!this.canManageThuongHieu) {
+        this.notifyAccessDenied();
+        return;
+      }
       this.$router.push({
         name: "thuong-hieu.edit",
         params: { id: id },
@@ -112,6 +163,10 @@ export default {
 
     // ==================== 4. Xóa một Thương Hiệu đơn lẻ ====================
     async deleteThuongHieu(id) {
+      if (!this.canManageThuongHieu) {
+        this.notifyAccessDenied();
+        return;
+      }
       if (
         confirm(`Bạn có chắc chắn muốn xóa Thương Hiệu có mã "${id}" không?`)
       ) {
@@ -134,6 +189,10 @@ export default {
 
     // ==================== 5. Xóa tất cả Thương Hiệu ====================
     async deleteAllThuongHieus() {
+      if (!this.canManageThuongHieu) {
+        this.notifyAccessDenied();
+        return;
+      }
       const confirm1 = confirm(
         "CẢNH BÁO: Bạn có chắc chắn muốn xóa TẤT CẢ Thương Hiệu không? Hành động này không thể hoàn tác!",
       );
@@ -168,3 +227,14 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+.btn-permission-muted {
+  opacity: 0.45;
+  cursor: pointer;
+}
+
+.btn-permission-muted:hover {
+  opacity: 0.65;
+}
+</style>

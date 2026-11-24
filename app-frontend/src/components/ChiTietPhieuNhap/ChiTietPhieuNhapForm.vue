@@ -1,24 +1,26 @@
 <template>
   <Form @submit="submitChiTiet" :validation-schema="chiTietFormSchema">
     <!-- Mã Phiếu Nhập & Mã Chi Tiết (Hiển thị disabled khi Edit) -->
-    <div v-if="isEdit" class="row">
+    <div v-if="hasRealIds" class="row">
       <div class="col-md-6 form-group mb-3">
-        <label for="id">Mã Chi Tiết:</label>
+        <label for="id" class="form-label fw-semibold">Mã Chi Tiết:</label>
         <Field
           name="id"
           type="text"
-          class="form-control"
+          class="form-control bg-light"
           v-model="chiTietLocal.id"
           disabled
         />
       </div>
 
       <div class="col-md-6 form-group mb-3">
-        <label for="id_phieu_nhap">Mã Phiếu Nhập:</label>
+        <label for="id_phieu_nhap" class="form-label fw-semibold"
+          >Mã Phiếu Nhập:</label
+        >
         <Field
           name="id_phieu_nhap"
           type="text"
-          class="form-control"
+          class="form-control bg-light"
           v-model="chiTietLocal.id_phieu_nhap"
           disabled
         />
@@ -37,11 +39,14 @@
           v-slot="{ field }"
           v-model="chiTietLocal.id_bien_the"
         >
-          <!-- Component Chọn Biến Thể 2 Cấp Mới -->
           <SelectBienTheTwoSteps
             v-model="chiTietLocal.id_bien_the"
             :ds-bien-the="dsBienThe"
-            :disabled="isEdit"
+            :ds-danh-muc="dsDanhMuc"
+            :ds-thuong-hieu="dsThuongHieu"
+            :dsIdBienTheDaCo="dsIdBienTheDaCo"
+            :selected-supplier-id="idNcc"
+            :disabled="!idNcc"
           />
         </Field>
 
@@ -130,6 +135,8 @@ import { Form, Field, ErrorMessage } from "vee-validate";
 
 // Import Service lấy danh sách Biến thể sản phẩm
 import BienTheService from "@/services/bien-the.service";
+import DanhMucService from "@/services/danh-muc.service";
+import ThuongHieuService from "@/services/thuong-hieu.service";
 
 import SelectBienTheTwoSteps from "@/components/ChiTietPhieuNhap/SelectBienTheTwoSteps.vue";
 
@@ -151,7 +158,15 @@ export default {
         gia_nhap: 0,
       }),
     },
+    idNcc: { type: String, default: "" },
     isEdit: { type: Boolean, default: false },
+
+    // Mảng ID sản phẩm đã tồn tại từ cha xuống để disable không cho chọn lại
+    // sản phẩm đã có trong phiếu nhập này trong form thêm mới
+    dsIdBienTheDaCo: {
+      type: Array,
+      default: () => [],
+    },
   },
   emits: ["submit:chiTiet", "cancel"],
   data() {
@@ -162,7 +177,7 @@ export default {
         .number()
         .typeError("Số lượng phải là chữ số.")
         .required("Số lượng không được để trống.")
-        .min(1, "Số lượng phải lớn hơn 0."),
+        .min(0, "Số lượng phải lớn hơn 0."),
       gia_nhap: yup
         .number()
         .typeError("Đơn giá phải là chữ số.")
@@ -173,6 +188,8 @@ export default {
     return {
       chiTietLocal: { ...this.chiTiet },
       dsBienThe: [],
+      dsDanhMuc: [],
+      dsThuongHieu: [],
       chiTietFormSchema,
     };
   },
@@ -182,6 +199,19 @@ export default {
       const sl = Number(this.chiTietLocal.so_luong_nhap) || 0;
       const dg = Number(this.chiTietLocal.gia_nhap) || 0;
       return sl * dg;
+    },
+
+    // Kiểm tra xem record có mã định danh thật từ DB hay không
+    hasRealIds() {
+      const id = this.chiTietLocal?.id;
+
+      // Nếu không có ID hoặc ID là mã tạm (bắt đầu bằng CT_TAM_) -> Ẩn
+      if (!id || (typeof id === "string" && id.startsWith("CT_TAM_"))) {
+        return false;
+      }
+
+      // Có ID thật từ DB -> Hiện
+      return true;
     },
   },
   watch: {
@@ -227,11 +257,39 @@ export default {
       }
     },
 
+    // Lấy danh sách Thương Hiệu cho ô BaseSelect
+    async fetchThuongHieu() {
+      try {
+        if (ThuongHieuService) {
+          this.dsThuongHieu = await ThuongHieuService.getAll({});
+        }
+      } catch (error) {
+        console.error("Lỗi khi lấy danh sách thương hiệu:", error);
+      }
+    },
+
+    // Lấy danh sách Danh Mục cho ô BaseSelect
+    async fetchDanhMuc() {
+      try {
+        if (DanhMucService) {
+          this.dsDanhMuc = await DanhMucService.getAll({});
+        }
+      } catch (error) {
+        console.error("Lỗi khi lấy danh sách danh mục:", error);
+      }
+    },
+
     submitChiTiet() {
-      // Gửi dữ liệu kèm theo giá trị thành tiền đã tự động tính
+      // 1. Tìm đối tượng biến thể đầy đủ thông tin trong danh sách dsBienThe
+      const selectedBienThe = this.dsBienThe.find(
+        (item) => item.id === this.chiTietLocal.id_bien_the,
+      );
+
+      // 2. Gửi dữ liệu ra ngoài cho component cha
       this.$emit("submit:chiTiet", {
-        ...this.chiTietLocal,
-        thanh_tien: this.thanhTien,
+        ...this.chiTietLocal, // Giữ nguyên các thông tin id_bien_the, so_luong_nhap, gia_nhap...
+        thanh_tien: this.thanhTien, // Thành tiền tự động tính
+        bien_the: selectedBienThe || null, // Đính kèm object biến thể (chứa CPU, GPU, RAM, Tên SP...)
       });
     },
 
@@ -241,6 +299,8 @@ export default {
   },
   async mounted() {
     await this.fetchDropdownData();
+    await this.fetchDanhMuc();
+    await this.fetchThuongHieu();
   },
 };
 </script>

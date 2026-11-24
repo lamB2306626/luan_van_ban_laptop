@@ -112,8 +112,14 @@ export default {
     // ==================== 1. Lấy danh sách Thông Báo theo bộ lọc ====================
     async retrieveThongBaos() {
       try {
+        // Gộp params mới từ tìm kiếm (nếu có) nhưng vẫn giữ da_xoa_bien_the: true
+        const queryParams = {
+          ...this.filter,
+          loai_thong_bao: "ADMIN_TAO",
+        };
+
         // Gửi tham số query { id: ..., title: ... } tới Backend
-        this.thongBaos = await ThongBaoService.getAll(this.filter);
+        this.thongBaos = await ThongBaoService.getAll(queryParams);
       } catch (error) {
         console.error("Lỗi khi tải danh sách thông báo:", error);
       }

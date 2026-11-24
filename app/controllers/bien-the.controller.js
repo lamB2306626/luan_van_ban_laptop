@@ -28,7 +28,9 @@ exports.create = async (req, res, next) => {
 
   try {
     // Lưu đường dẫn file relative vào database
-    req.body.duong_dan_anh = `${req.file.filename}`;
+    if (req.file) {
+      req.body.duong_dan_anh = req.file.filename;
+    }
 
     const Service = new BienTheService();
     const document = await Service.create(req.body);
@@ -68,9 +70,15 @@ exports.findAll = async (req, res, next) => {
       id: req.query.id, // Lọc theo mã biến thể (?id=BT01)
       id_san_pham: req.query.id_san_pham, // Lọc theo mã sản phẩm (?id_san_pham=SP01)
       // Lọc theo trạng thái
-      trang_thai:
+      da_xoa:
         req.query.trang_thai !== undefined
           ? req.query.trang_thai === "true"
+          : undefined,
+
+      // Lọc theo cờ đã xóa
+      da_xoa:
+        req.query.da_xoa !== undefined
+          ? req.query.da_xoa === "true"
           : undefined,
     };
 
@@ -83,14 +91,14 @@ exports.findAll = async (req, res, next) => {
 
 // ============================== 3. Cập nhật Biến Thể theo mã ==================================
 exports.update = async (req, res, next) => {
-  if (Object.keys(req.body).length === 0) {
+  // Bỏ hoặc sửa lại điều kiện kiểm tra: Cho phép chạy tiếp nếu CÓ file HOẶC CÓ body
+  if (!req.file && Object.keys(req.body).length === 0) {
     return next(new ApiError(400, "Dữ liệu cập nhật không được để trống"));
   }
 
   try {
-    // NẾU NGƯỜI DÙNG CÓ UPLOAD FILE MỚI -> MỚI CẬP NHẬT TRƯỜNG lo_go
+    // Nếu có upload ảnh ở Tab 2 -> Gán tên file vào duong_dan_anh
     if (req.file) {
-      // Chỉ lưu tên file vào DB theo cấu hình cũ của bạn
       req.body.duong_dan_anh = req.file.filename;
     }
 
@@ -103,6 +111,7 @@ exports.update = async (req, res, next) => {
 
     return res.send({ message: "Cập nhật Biến thể thành công", document });
   } catch (error) {
+    console.error("LỖI: ", error);
     if (error.message === "KHOA_NGOAI_KHONG_TON_TAI") {
       return next(
         new ApiError(
@@ -135,6 +144,7 @@ exports.delete = async (req, res, next) => {
 
     return res.send({ message: "Đã xóa Biến thể thành công" });
   } catch (error) {
+    console.error("LỖI:", error);
     return next(
       new ApiError(
         500,
@@ -159,11 +169,12 @@ exports.restore = async (req, res, next) => {
       data: document,
     });
   } catch (error) {
-    if (error.message === "SAN_PHAM_DANG_NGUNG_KINH_DOANH") {
+    console.log(error);
+    if (error.message === "SAN_PHAM_DA_XOA_KHOI_HE_THONG") {
       return next(
         new ApiError(
           400,
-          "Không thể khôi phục biến thể vì Sản phẩm cha hiện đang ngừng kinh doanh!",
+          "Không thể khôi phục biến thể vì Sản phẩm cha hiện đã xóa khỏi hệ thống!",
         ),
       );
     }

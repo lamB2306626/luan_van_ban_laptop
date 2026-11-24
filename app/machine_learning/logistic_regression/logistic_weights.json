@@ -1,0 +1,16 @@
+{
+    "intercept": -1.923527,
+    "coefficients": {
+        "is_brand_match": 0.920843,
+        "is_category_match": 0.928328,
+        "color_match_score": 0.059869,
+        "cpu_match_score": 0.653608,
+        "gpu_match_score": 0.556908,
+        "ram_match_score": 0.552034,
+        "rom_match_score": 0.25632,
+        "price_diff_ratio": -0.980503,
+        "keyword_sim_score": 0.31867,
+        "item_sales_log": 0.077438,
+        "item_avg_rating": 0.17632
+    }
+}

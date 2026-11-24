@@ -1,5 +1,4 @@
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+const prisma = require("../utils/prisma");
 
 class YeuThichService {
   // Lọc lấy các trường thuộc tính hợp lệ của Yêu Thích
@@ -27,12 +26,12 @@ class YeuThichService {
       });
 
       if (!lastYeuThich) {
-        payload.id = "YT01";
+        payload.id = "YT0001";
       } else {
         // Lấy phần số ra khỏi chuỗi (VD: "YT05" -> lấy số 5)
         const currentNumber =
           parseInt(lastYeuThich.id.replace(/\D/g, ""), 10) || 0;
-        payload.id = `YT${String(currentNumber + 1).padStart(2, "0")}`;
+        payload.id = `YT${String(currentNumber + 1).padStart(4, "0")}`;
       }
     }
 
@@ -136,6 +135,45 @@ class YeuThichService {
         khach_hang: true,
       },
     });
+  }
+
+  // Lấy thống kê số lượt yêu thích (Hỗ trợ cả 1 ID hoặc Mảng ID sản phẩm)
+  async getThongKeYeuThich(idSanPhams) {
+    if (!idSanPhams || (Array.isArray(idSanPhams) && idSanPhams.length === 0)) {
+      return Array.isArray(idSanPhams) ? new Map() : { tong_luot_yeu_thich: 0 };
+    }
+
+    // Trường hợp 1: Truyền vào mảng các ID sản phẩm (dùng cho hàm find)
+    if (Array.isArray(idSanPhams)) {
+      const listThongKe = await prisma.yeu_thich.groupBy({
+        by: ["id_san_pham"],
+        where: {
+          id_san_pham: { in: idSanPhams },
+        },
+        _count: {
+          id: true,
+        },
+      });
+
+      // Map lưu kết quả thống kê theo từng id_san_pham
+      const thongKeMap = new Map();
+      listThongKe.forEach((tk) => {
+        thongKeMap.set(tk.id_san_pham, {
+          tong_luot_yeu_thich: tk._count.id || 0,
+        });
+      });
+
+      return thongKeMap;
+    }
+
+    // Trường hợp 2: Truyền vào 1 ID duy nhất (dùng cho hàm findById)
+    const count = await prisma.yeu_thich.count({
+      where: { id_san_pham: idSanPhams },
+    });
+
+    return {
+      tong_luot_yeu_thich: count || 0,
+    };
   }
 }
 

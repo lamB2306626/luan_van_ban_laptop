@@ -12,8 +12,8 @@ exports.create = async (req, res, next) => {
   if (!req.body?.sdt_nguoi_nhan) {
     return next(new ApiError(400, "sdt_nguoi_nhan không được để trống"));
   }
-  if (!req.body?.dia_chi) {
-    return next(new ApiError(400, "dia_chi không được để trống"));
+  if (!req.body?.dia_chi_cu_the) {
+    return next(new ApiError(400, "dia_chi_cu_the không được để trống"));
   }
 
   try {
@@ -24,6 +24,7 @@ exports.create = async (req, res, next) => {
       data: document,
     });
   } catch (error) {
+    console.error("LỖI: ", error);
     if (error.message === "KHACH_HANG_KHONG_TON_TAI") {
       return next(
         new ApiError(400, "Mã khách hàng không tồn tại trong hệ thống"),
@@ -43,7 +44,7 @@ exports.findAll = async (req, res, next) => {
 
     const filterData = {
       id: req.query.id, // Lọc theo mã địa chỉ (?id=DC01)
-      id_khach_hang: req.query.customer_id, // Lọc theo mã khách hàng (?customer_id=KH01)
+      id_khach_hang: req.query.id_khach_hang, // Lọc theo mã khách hàng (?customer_id=KH01)
       ten_nguoi_nhan: req.query.name, // Lọc theo tên người nhận (?name=Nguyen)
       sdt_nguoi_nhan: req.query.phone, // Lọc theo SĐT (?phone=090)
     };
@@ -58,7 +59,12 @@ exports.findAll = async (req, res, next) => {
 // ============================== 3. Cập nhật Địa Chỉ theo mã ==================================
 exports.update = async (req, res, next) => {
   if (Object.keys(req.body).length === 0) {
-    return next(new ApiError(400, "Dữ liệu cập nhật không được để trống"));
+    return next(
+      new ApiError(
+        400,
+        "Dữ liệu cập nhật không được để trống không được để trống",
+      ),
+    );
   }
 
   try {

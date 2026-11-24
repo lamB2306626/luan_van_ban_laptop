@@ -30,6 +30,11 @@ class PhieuGiamGiaService {
     return (await this.api.delete(`/${id}`)).data;
   }
 
+  // 6. Khôi phục 1 phiếu giảm giá theo ID
+  async restore(id) {
+    return (await this.api.patch(`/${id}/restore`)).data;
+  }
+
   // 6. Xóa tất cả danh mục
   async deleteAll() {
     return (await this.api.delete("/")).data;

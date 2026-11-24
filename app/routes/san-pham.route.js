@@ -5,11 +5,13 @@ const upload = require("../middlewares/uploadAnhSanPham");
 const router = express.Router();
 
 router.route("/:id/restore").patch(sanPham.restore);
+router.route("/lay-cho-goi-y").get(sanPham.getAllProductsForRecommendation);
+router.route("/for-rag").get(sanPham.getDataForRAG);
 
 router
   .route("/")
   .get(sanPham.findAll)
-  .post(upload.array("images", 10),  sanPham.create)
+  .post(upload.array("images", 10), sanPham.create)
   .delete(sanPham.deleteAll);
 
 router

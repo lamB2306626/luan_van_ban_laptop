@@ -42,7 +42,7 @@
     <!-- Nội dung hiển thị theo từng Tab -->
     <div class="tab-content border rounded p-4 bg-white shadow-sm">
       <!-- TAB 1: THÔNG TIN PHIẾU NHẬP -->
-      <div v-if="activeTab === 'thong-tin-chung'">
+      <div v-show="activeTab === 'thong-tin-chung'">
         <!-- Chỉ render Form khi đã lấy xong dữ liệu phieuNhap từ API -->
         <PhieuNhapForm
           v-if="phieuNhap"
@@ -61,7 +61,7 @@
       </div>
 
       <!-- TAB 2: QUẢN LÝ CHI TIẾT PHIẾU NHẬP -->
-      <div v-if="activeTab === 'quan-ly-chi-tiet'">
+      <div v-show="activeTab === 'quan-ly-chi-tiet'">
         <ChiTietPhieuNhapList
           :idPhieuNhap="id"
           @refreshPhieuNhap="getPhieuNhapDetail"

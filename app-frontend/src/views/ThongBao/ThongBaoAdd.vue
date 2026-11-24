@@ -34,17 +34,16 @@ export default {
   },
   methods: {
     async createThongBao(formData) {
-      // Gom chung data và gửi 1 lần duy nhất
-      // const payload = {
-      //   ...formData.thongBao,
-      //   // Nếu có tích chọn gửi ngay thì truyền danh sách ID, ngược lại truyền mảng rỗng
-      //   danh_sach_id_khach_hang: formData.isSendImmediately
-      //     ? formData.customerIds
-      //     : [],
-      // };
-
+      // Chuẩn bị dữ liệu gửi lên API
+      const thongBaoData = {
+        tieu_de: formData.tieu_de,
+        noi_dung: formData.noi_dung,
+        lien_ket: formData.lien_ket,
+        danh_sach_id_khach_hang: formData.danh_sach_id_khach_hang,
+        loai_thong_bao: "ADMIN_TAO",
+      };
       try {
-        await ThongBaoService.create(formData);
+        await ThongBaoService.create(thongBaoData);
         this.message = "Thêm mới Thông Báo thành công!";
 
         setTimeout(() => {

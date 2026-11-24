@@ -5,11 +5,19 @@
     <!-- Component Tìm kiếm Nhà Cung Cấp -->
     <NhaCungCapSearch v-model="filter" @submit="retrieveNhaCungCaps" />
 
-    <button class="btn btn-primary mb-3" @click="goToAddNhaCungCap">
+    <button
+      class="btn btn-primary mb-3"
+      :class="{ 'btn-permission-muted': !canManageNCC }"
+      @click="goToAddNhaCungCap"
+    >
       <i class="fas fa-plus"></i> Thêm mới Nhà Cung Cấp
     </button>
 
-    <button class="btn btn-danger mb-3 ms-2" @click="deleteAllNhaCungCaps">
+    <button
+      class="btn btn-danger mb-3 ms-2"
+      :class="{ 'btn-permission-muted': !canManageNCC }"
+      @click="deleteAllNhaCungCaps"
+    >
       <i class="fas fa-trash"></i> Xóa tất cả Nhà Cung Cấp
     </button>
 
@@ -34,6 +42,7 @@
           <td>
             <button
               class="btn btn-sm btn-secondary me-2"
+              :class="{ 'btn-permission-muted': !canManageNCC }"
               @click="goToUpdateNhaCungCap(ncc.id)"
             >
               <i class="fas fa-edit"></i> Cập nhật
@@ -41,6 +50,7 @@
 
             <button
               class="btn btn-sm btn-danger"
+              :class="{ 'btn-permission-muted': !canManageNCC }"
               @click="deleteNhaCungCap(ncc.id)"
             >
               <i class="fas fa-trash"></i> Xóa
@@ -63,6 +73,8 @@
 import NhaCungCapSearch from "@/components/NhaCungCap/NhaCungCapSearch.vue";
 import NhaCungCapService from "@/services/nha-cung-cap.service";
 
+const ALLOWED_NHA_CUNG_CAP_ROLES = ["Nhân viên kho", "Quản trị viên"];
+
 export default {
   name: "NhaCungCapView",
   components: {
@@ -78,7 +90,38 @@ export default {
     };
   },
 
+  computed: {
+    currentAdminUser() {
+      try {
+        const userStr = localStorage.getItem("adminUser");
+        return userStr ? JSON.parse(userStr) : null;
+      } catch (e) {
+        return null;
+      }
+    },
+
+    adminRole() {
+      if (!this.currentAdminUser) return null;
+      return this.currentAdminUser.vai_tro.ten_vai_tro;
+    },
+
+    canManageNCC() {
+      return (
+        !!this.adminRole && ALLOWED_NHA_CUNG_CAP_ROLES.includes(this.adminRole)
+      );
+    },
+  },
+
   methods: {
+    // ==================== Phát tín hiệu không có quyền thực hiện thao tác ====================
+    notifyAccessDenied(message = "Bạn không có quyền thực hiện thao tác này!") {
+      window.dispatchEvent(
+        new CustomEvent("admin-access-denied", {
+          detail: { message },
+        }),
+      );
+    },
+
     // ==================== 1. Lấy danh sách Nhà Cung Cấp theo bộ lọc ====================
     async retrieveNhaCungCaps() {
       try {
@@ -90,11 +133,19 @@ export default {
 
     // ==================== 2. Điều hướng tới Form Thêm Mới ====================
     goToAddNhaCungCap() {
+      if (!this.canManageNCC) {
+        this.notifyAccessDenied();
+        return;
+      }
       this.$router.push({ name: "nha-cung-cap.add" });
     },
 
     // ==================== 3. Điều hướng tới Form Cập Nhật ====================
     goToUpdateNhaCungCap(id) {
+      if (!this.canManageNCC) {
+        this.notifyAccessDenied();
+        return;
+      }
       this.$router.push({
         name: "nha-cung-cap.edit",
         params: { id: id },
@@ -103,7 +154,13 @@ export default {
 
     // ==================== 4. Xóa một Nhà Cung Cấp đơn lẻ ====================
     async deleteNhaCungCap(id) {
-      if (confirm(`Bạn có chắc chắn muốn xóa Nhà Cung Cấp có mã "${id}" không?`)) {
+      if (!this.canManageNCC) {
+        this.notifyAccessDenied();
+        return;
+      }
+      if (
+        confirm(`Bạn có chắc chắn muốn xóa Nhà Cung Cấp có mã "${id}" không?`)
+      ) {
         try {
           await NhaCungCapService.delete(id);
           alert("Xóa Nhà Cung Cấp thành công!");
@@ -123,13 +180,17 @@ export default {
 
     // ==================== 5. Xóa tất cả Nhà Cung Cấp ====================
     async deleteAllNhaCungCaps() {
+      if (!this.canManageNCC) {
+        this.notifyAccessDenied();
+        return;
+      }
       const confirm1 = confirm(
-        "CẢNH BÁO: Bạn có chắc chắn muốn xóa TẤT CẢ Nhà Cung Cấp không? Hành động này không thể hoàn tác!"
+        "CẢNH BÁO: Bạn có chắc chắn muốn xóa TẤT CẢ Nhà Cung Cấp không? Hành động này không thể hoàn tác!",
       );
 
       if (confirm1) {
         const confirm2 = confirm(
-          "BẠN CÓ THỰC SỰ CHẮC CHẮN? Tất cả dữ liệu Nhà Cung Cấp sẽ bị xóa sạch hoàn toàn!"
+          "BẠN CÓ THỰC SỰ CHẮC CHẮN? Tất cả dữ liệu Nhà Cung Cấp sẽ bị xóa sạch hoàn toàn!",
         );
 
         if (confirm2) {
@@ -157,3 +218,14 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+.btn-permission-muted {
+  opacity: 0.45;
+  cursor: pointer;
+}
+
+.btn-permission-muted:hover {
+  opacity: 0.65;
+}
+</style>

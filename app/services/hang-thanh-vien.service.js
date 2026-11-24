@@ -1,5 +1,4 @@
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+const prisma = require("../utils/prisma");
 const PhieuHangThanhVienService = require("./phieu-hang-thanh-vien.service");
 const KhachHangService = require("./khach-hang.service");
 
@@ -35,11 +34,11 @@ class HangThanhVienService {
       });
 
       if (!lastHangThanhVien) {
-        payload.id = "HTV01";
+        payload.id = "HTV0001";
       } else {
         const currentNumber =
           parseInt(lastHangThanhVien.id.replace(/\D/g, ""), 10) || 0;
-        payload.id = `HTV${String(currentNumber + 1).padStart(2, "0")}`;
+        payload.id = `HTV${String(currentNumber + 1).padStart(4, "0")}`;
       }
     }
 
@@ -186,7 +185,7 @@ class HangThanhVienService {
         where: { id: id },
       });
 
-      // có thể không cần gọi hàm cập nhật hạng vì vốn chỉ cho xóa hạng thành viên không thuộc về khách hàng nào nến nếu cập nhật cũng không xảy ra thay đổi hạng 
+      // có thể không cần gọi hàm cập nhật hạng vì vốn chỉ cho xóa hạng thành viên không thuộc về khách hàng nào nến nếu cập nhật cũng không xảy ra thay đổi hạng
       // this.khachHangService.updateHangAllKhachHang();
 
       return result;

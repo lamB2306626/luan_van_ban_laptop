@@ -34,6 +34,16 @@ class ChiTietThongBaoService {
   async deleteAll() {
     return (await this.api.delete("/")).data;
   }
+
+  // 7. Đánh dấu đọc tất cả thông bào
+  async markOneAsRead(idThongBao) {
+    return (await this.api.patch(`/read-one/${idThongBao}`)).data;
+  }
+
+  // 8. Đánh dấu đọc tất cả thông bào
+  async markAllAsRead(idKhachHang) {
+    return (await this.api.patch(`/read-all/${idKhachHang}`)).data;
+  }
 }
 
 export default new ChiTietThongBaoService();

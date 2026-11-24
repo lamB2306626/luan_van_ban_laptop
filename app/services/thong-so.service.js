@@ -1,5 +1,4 @@
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+const prisma = require("../utils/prisma");
 
 class ThongSoService {
   // Lọc lấy các trường thuộc tính hợp lệ của thong_so
@@ -24,10 +23,11 @@ class ThongSoService {
   }
 
   // 1. Tạo Thông Số mới (Tự sinh mã TS01, TS02 nếu client không truyền id)
-  async create(payload) {
+  async create(payload, tx) {
+    const db = tx || prisma;
     if (!payload.id) {
       // Tìm 1 thông số có ID lớn nhất hiện tại
-      const lastThongSo = await prisma.thong_so.findFirst({
+      const lastThongSo = await db.thong_so.findFirst({
         orderBy: {
           id: "desc", // Sắp xếp ID giảm dần (ví dụ: TS05, TS04...)
         },
@@ -44,12 +44,44 @@ class ThongSoService {
 
     const data = this.extractThongSoData(payload);
     try {
-      return await prisma.thong_so.create({
+      // 1. Tạo bản ghi thông số kỹ thuật
+      const newThongSo = await db.thong_so.create({
         data: data,
         include: {
           san_pham: true, // Lấy kèm thông tin sản phẩm sở hữu thông số này
         },
       });
+
+      // 2. KIỂM TRA VÀ CẬP NHẬT TRẠNG THÁI SẢN PHẨM TỪ DANG_HOAN_THIEN SANG DANG_KINH_DOANH
+      if (newThongSo && newThongSo.id_san_pham) {
+        const productId = newThongSo.id_san_pham;
+
+        // Truy vấn lại thông tin sản phẩm kèm danh sách biến thể hiện có
+        const sanPham = await db.san_pham.findUnique({
+          where: { id: productId },
+          include: {
+            bien_the: true, // Lấy danh sách biến thể
+          },
+        });
+
+        // Điều kiện để được chuyển sang DANG_KINH_DOANH:
+        // - Sản phẩm đang ở trạng thái DANG_HOAN_THIEN
+        // - Đã có thông số kỹ thuật (chắc chắn có vì vừa tạo xong `newThongSo`)
+        // - Có ít nhất 1 biến thể
+        if (
+          sanPham &&
+          sanPham.trang_thai === "DANG_HOAN_THIEN" &&
+          sanPham.bien_the &&
+          sanPham.bien_the.length > 0
+        ) {
+          await db.san_pham.update({
+            where: { id: productId },
+            data: { trang_thai: "DANG_KINH_DOANH" },
+          });
+        }
+      }
+
+      return newThongSo;
     } catch (error) {
       // P2002: Vi phạm ràng buộc UNIQUE (Sản phẩm này đã có thông số kỹ thuật rồi)
       if (error.code === "P2002") {
@@ -88,7 +120,7 @@ class ThongSoService {
     const updateData = this.extractThongSoData(payload);
     delete updateData.id; // Không cho phép cập nhật khóa chính (id)
     delete updateData.id_san_pham;
-    
+
     try {
       const result = await prisma.thong_so.update({
         where: { id: id },

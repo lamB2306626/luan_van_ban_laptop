@@ -43,7 +43,7 @@ exports.findAll = async (req, res, next) => {
 
     const filterData = {
       id: req.query.id,
-      ten_nha_cung_cap: req.query.name, 
+      ten_nha_cung_cap: req.query.name,
     };
 
     const documents = await Service.find(filterData);
@@ -58,7 +58,12 @@ exports.findAll = async (req, res, next) => {
 // ============================== 3. Cập nhật Nhà cung cấp theo mã ==================================
 exports.update = async (req, res, next) => {
   if (Object.keys(req.body).length === 0) {
-    return next(new ApiError(400, "Dữ liệu cập nhật không được để trống"));
+    return next(
+      new ApiError(
+        400,
+        "Dữ liệu cập nhật không được để trống không được để trống",
+      ),
+    );
   }
 
   try {
@@ -104,16 +109,16 @@ exports.delete = async (req, res, next) => {
       return next(
         new ApiError(
           400,
-          "Không thể xóa Nhà cung cấp này vì đang có Phiếu nhập liên kết!"
-        )
+          "Không thể xóa Nhà cung cấp này vì đang có Phiếu nhập liên kết!",
+        ),
       );
     }
 
     return next(
       new ApiError(
         500,
-        `Đã xảy ra lỗi khi xóa Nhà cung cấp với mã = ${req.params.id}`
-      )
+        `Đã xảy ra lỗi khi xóa Nhà cung cấp với mã = ${req.params.id}`,
+      ),
     );
   }
 };
@@ -130,8 +135,8 @@ exports.deleteAll = async (req, res, next) => {
     return next(
       new ApiError(
         500,
-        "Đã xảy ra lỗi trong quá trình dọn dẹp các Nhà cung cấp"
-      )
+        "Đã xảy ra lỗi trong quá trình dọn dẹp các Nhà cung cấp",
+      ),
     );
   }
 };

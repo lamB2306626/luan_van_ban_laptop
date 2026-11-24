@@ -42,6 +42,11 @@ class NhanVienService {
     return (await this.api.delete(`/${id}`)).data;
   }
 
+  // 6. Khôi phục 1 nhân viên theo ID
+  async restore(id) {
+    return (await this.api.patch(`/${id}/restore`)).data;
+  }
+
   // 6. Xóa tất cả nhân viên
   async deleteAll() {
     return (await this.api.delete("/")).data;

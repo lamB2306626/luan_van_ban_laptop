@@ -3,6 +3,8 @@ const thongBao = require("../controllers/thong-bao.controller");
 
 const router = express.Router();
 
+router.route("/count/:id_khach_hang").get(thongBao.countUnreadByKhachHangId);
+
 router
   .route("/")
   .get(thongBao.findAll)

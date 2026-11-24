@@ -5,13 +5,23 @@
     <!-- Component Tìm kiếm Danh mục -->
     <SearchDanhMuc v-model="filter" @submit="retrieveDanhMucs" />
 
-    <button class="btn btn-primary mb-3" @click="goToAddDanhMuc">
-      <i class="fas fa-plus"></i> Thêm mới Danh Mục
-    </button>
+    <div class="mb-3">
+      <button
+        class="btn btn-primary"
+        :class="{ 'btn-permission-muted': !canManageDanhMuc }"
+        @click="goToAddDanhMuc"
+      >
+        <i class="fas fa-plus"></i> Thêm mới Danh Mục
+      </button>
 
-    <button class="btn btn-danger mb-3 ms-2" @click="deleteAllDanhMucs">
-      <i class="fas fa-trash"></i> Xóa tất cả Danh Mục
-    </button>
+      <button
+        class="btn btn-danger ms-2"
+        :class="{ 'btn-permission-muted': !canManageDanhMuc }"
+        @click="deleteAllDanhMucs"
+      >
+        <i class="fas fa-trash"></i> Xóa tất cả Danh Mục
+      </button>
+    </div>
 
     <table class="table table-bordered table-striped">
       <thead class="table-dark">
@@ -30,6 +40,7 @@
           <td>
             <button
               class="btn btn-sm btn-secondary me-2"
+              :class="{ 'btn-permission-muted': !canManageDanhMuc }"
               @click="goToUpdateDanhMuc(danhMuc.id)"
             >
               <i class="fas fa-edit"></i> Cập nhật
@@ -37,6 +48,7 @@
 
             <button
               class="btn btn-sm btn-danger"
+              :class="{ 'btn-permission-muted': !canManageDanhMuc }"
               @click="deleteDanhMuc(danhMuc.id)"
             >
               <i class="fas fa-trash"></i> Xóa
@@ -59,6 +71,8 @@
 import SearchDanhMuc from "@/components/DanhMuc/DanhMucSearch.vue";
 import DanhMucService from "@/services/danh-muc.service";
 
+const ALLOWED_DANH_MUC_ROLES = ["Nhân viên kho", "Quản trị viên"];
+
 export default {
   name: "DanhMucView",
   components: {
@@ -74,7 +88,38 @@ export default {
     };
   },
 
+  computed: {
+    currentAdminUser() {
+      try {
+        const userStr = localStorage.getItem("adminUser");
+        return userStr ? JSON.parse(userStr) : null;
+      } catch (e) {
+        return null;
+      }
+    },
+
+    adminRole() {
+      if (!this.currentAdminUser) return null;
+      return this.currentAdminUser.vai_tro.ten_vai_tro;
+    },
+
+    canManageDanhMuc() {
+      return (
+        !!this.adminRole && ALLOWED_DANH_MUC_ROLES.includes(this.adminRole)
+      );
+    },
+  },
+
   methods: {
+    // ==================== Phát tín hiệu không có quyền thực hiện thao tác ====================
+    notifyAccessDenied(message = "Bạn không có quyền thực hiện thao tác này!") {
+      window.dispatchEvent(
+        new CustomEvent("admin-access-denied", {
+          detail: { message },
+        }),
+      );
+    },
+
     // ==================== 1. Lấy danh sách Danh Mục theo bộ lọc ====================
     async retrieveDanhMucs() {
       try {
@@ -87,11 +132,19 @@ export default {
 
     // ==================== 2. Điều hướng tới Form Thêm Mới Danh Mục ====================
     goToAddDanhMuc() {
+      if (!this.canManageDanhMuc) {
+        this.notifyAccessDenied();
+        return;
+      }
       this.$router.push({ name: "danh-muc.add" });
     },
 
     // ==================== 3. Điều hướng tới Form Cập Nhật Danh Mục ====================
     goToUpdateDanhMuc(id) {
+      if (!this.canManageDanhMuc) {
+        this.notifyAccessDenied();
+        return;
+      }
       this.$router.push({
         name: "danh-muc.edit",
         params: { id: id },
@@ -100,6 +153,11 @@ export default {
 
     // ==================== 4. Xóa một Danh Mục đơn lẻ ====================
     async deleteDanhMuc(id) {
+      if (!this.canManageDanhMuc) {
+        this.notifyAccessDenied();
+        return;
+      }
+
       if (confirm(`Bạn có chắc chắn muốn xóa Danh Mục có mã "${id}" không?`)) {
         try {
           await DanhMucService.delete(id);
@@ -122,6 +180,11 @@ export default {
 
     // ==================== 5. Xóa tất cả Danh Mục ====================
     async deleteAllDanhMucs() {
+      if (!this.canManageDanhMuc) {
+        this.notifyAccessDenied();
+        return;
+      }
+
       const confirm1 = confirm(
         "CẢNH BÁO: Bạn có chắc chắn muốn xóa TẤT CẢ Danh Mục không? Hành động này không thể hoàn tác!",
       );
@@ -158,3 +221,14 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+.btn-permission-muted {
+  opacity: 0.45;
+  cursor: pointer;
+}
+
+.btn-permission-muted:hover {
+  opacity: 0.65;
+}
+</style>

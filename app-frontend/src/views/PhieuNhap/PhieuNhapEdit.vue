@@ -1,5 +1,5 @@
 <template>
-  <div class="container mt-3 col-md-6">
+  <div class="container mt-3">
     <h4>Cập Nhật Phiếu Nhập</h4>
 
     <!-- Chỉ hiển thị Form khi dữ liệu phieuNhapData đã được lấy về từ API -->

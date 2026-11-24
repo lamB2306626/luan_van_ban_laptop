@@ -12,8 +12,24 @@ exports.create = async (req, res, next) => {
   if (!req.body?.id_danh_muc) {
     return next(new ApiError(400, "id_danh_muc không được để trống"));
   }
-  if (!req.body?.id_nha_cc) {
-    return next(new ApiError(400, "id_ncc không được để trống"));
+
+  // do bên front mã hóa bằng JSON.stringify nên lúc controller tiếp nhân dữ liệu phải thực hiện giải mã bằng JSON.parse
+  if (req.body?.la_anh_chinh) {
+    req.body.la_anh_chinh = JSON.parse(req.body.la_anh_chinh);
+  }
+
+  if (req.body?.danh_sach_nha_cung_cap) {
+    req.body.danh_sach_nha_cung_cap = JSON.parse(
+      req.body.danh_sach_nha_cung_cap,
+    );
+  }
+
+  if (req.body?.thong_so_ky_thuat) {
+    req.body.thong_so_ky_thuat = JSON.parse(req.body.thong_so_ky_thuat);
+  }
+
+  if (req.body?.danh_sach_bien_the) {
+    req.body.danh_sach_bien_the = JSON.parse(req.body.danh_sach_bien_the);
   }
 
   try {
@@ -41,14 +57,22 @@ exports.create = async (req, res, next) => {
     if (error.message === "ID_DANH_MUC_KHONG_TON_TAI") {
       return next(new ApiError(404, "Mã danh mục truyền vào không tồn tại"));
     }
-    if (error.message === "ID_NHA_CUNG_CAP_KHONG_TON_TAI") {
-      return next(
-        new ApiError(404, "Mã nhà cung cấp truyền vào không tồn tại"),
-      );
-    }
     if (error.message === "ID_SAN_PHAM_KHONG_TON_TAI") {
       return next(
         new ApiError(400, "Sản phẩm này không tồn tại trong hệ thống"),
+      );
+    }
+    if (error.message === "NHA_CUNG_CAP_HOAC_SAN_PHAM_KHONG_TON_TAI") {
+      return next(
+        new ApiError(400, "Nhà cung cấp hoặc sản phẩm không tồn tại"),
+      );
+    }
+    if (error.message === "TAT_CA_LIEN_KET_DA_TON_TAI_TRUOC_DO") {
+      return next(
+        new ApiError(
+          400,
+          "Tất cả nhà cung cấp trong danh sách đã được liên kết với sản phẩm này rồi",
+        ),
       );
     }
 
@@ -69,10 +93,10 @@ exports.findAll = async (req, res, next) => {
       ten_san_pham: req.query.name || req.query.ten_san_pham, // (?name=MacBook)
       id_thuong_hieu: req.query.id_thuong_hieu, // (?id_thuong_hieu=TH01)
       id_danh_muc: req.query.id_danh_muc, // (?id_danh_muc=DM01)
-      id_nha_cc: req.query.id_nha_cc, // (?id_nha_cc=NCC01)
-      trang_thai:
-        req.query.trang_thai !== undefined
-          ? req.query.trang_thai === "true"
+      trang_thai: req.query.trang_thai,
+      da_xoa:
+        req.query.da_xoa !== undefined
+          ? req.query.da_xoa === "true"
           : undefined,
 
       // 2. Bộ lọc cấu hình biến thể bổ sung
@@ -81,6 +105,8 @@ exports.findAll = async (req, res, next) => {
       id_ram: req.query.id_ram, // (?id_ram=RAM01)
       id_rom: req.query.id_rom, // (?id_rom=ROM01)
       id_mau_sac: req.query.id_mau_sac, // (?id_mau_sac=MS01)
+      trang_thai_bien_the: req.query.trang_thai_bien_the,
+      da_xoa_bien_the: req.query.da_xoa_bien_the, // (?id_mau_sac=MS01)
 
       // 3. Bộ lọc khoảng giá
       min_price: req.query.gia_tu, // (?min_price=10000000)
@@ -97,8 +123,24 @@ exports.findAll = async (req, res, next) => {
 
 // ============================== 3. Cập nhật Sản Phẩm theo mã ==================================
 exports.update = async (req, res, next) => {
+  // do bên front mã hóa bằng JSON.stringify nên lúc controller tiếp nhân dữ liệu phải thực hiện giải mã bằng JSON.parse
+  if (req.body?.la_anh_chinh) {
+    req.body.la_anh_chinh = JSON.parse(req.body.la_anh_chinh);
+  }
+
+  if (req.body?.danh_sach_nha_cung_cap) {
+    req.body.danh_sach_nha_cung_cap = JSON.parse(
+      req.body.danh_sach_nha_cung_cap,
+    );
+  }
+
   if (Object.keys(req.body).length === 0) {
-    return next(new ApiError(400, "Dữ liệu cập nhật không được để trống"));
+    return next(
+      new ApiError(
+        400,
+        "Dữ liệu cập nhật không được để trống không được để trống",
+      ),
+    );
   }
 
   try {
@@ -113,6 +155,7 @@ exports.update = async (req, res, next) => {
 
     return res.send({ message: "Cập nhật Sản phẩm thành công", document });
   } catch (error) {
+    console.error(error);
     if (error.message === "TEN_SAN_PHAM_DA_TON_TAI") {
       return next(
         new ApiError(400, "Tên sản phẩm này đã tồn tại trong hệ thống"),
@@ -123,11 +166,6 @@ exports.update = async (req, res, next) => {
     }
     if (error.message === "ID_DANH_MUC_KHONG_TON_TAI") {
       return next(new ApiError(404, "Mã danh mục mới không tồn tại"));
-    }
-    if (error.message === "ID_NHA_CUNG_CAP_KHONG_TON_TAI") {
-      return next(
-        new ApiError(404, "Mã nhà cung cấp truyền vào không tồn tại"),
-      );
     }
     if (error.message === "ID_SAN_PHAM_KHONG_TON_TAI") {
       return next(
@@ -211,6 +249,38 @@ exports.findOne = async (req, res, next) => {
   } catch (error) {
     return next(
       new ApiError(500, `Lỗi khi truy vấn Sản phẩm với mã = ${req.params.id}`),
+    );
+  }
+};
+
+// =================== Lấy danh sách Sản Phẩm cho gợi ý sản phẩm (đầy đủ biến thể chứ không chỉ lấy biến thể đại diện) =================
+exports.getAllProductsForRecommendation = async (req, res, next) => {
+  try {
+    const Service = new SanPhamService();
+
+    const documents = await Service.getAllProductsForRecommendation();
+    return res.send(documents);
+  } catch (error) {
+    console.error("Lỗi Checkout Chi Tiết:", error);
+    return next(
+      new ApiError(500, "Đã xảy ra lỗi khi lấy danh sách Sản Phẩm cho gợi ý"),
+    );
+  }
+};
+
+// ================== Lấy dữ liệu sản phẩm đã làm phẳng cho AI RAG ==================
+exports.getDataForRAG = async (req, res, next) => {
+  try {
+    const sanPhamService = new SanPhamService();
+    const documents = await sanPhamService.getFlattenedDataForRAG();
+    return res.send({
+      total: documents.length,
+      data: documents,
+    });
+  } catch (error) {
+    console.error("Lỗi lấy dữ liệu RAG:", error);
+    return next(
+      new ApiError(500, "Đã xảy ra lỗi khi chuẩn hóa dữ liệu sản phẩm cho AI"),
     );
   }
 };

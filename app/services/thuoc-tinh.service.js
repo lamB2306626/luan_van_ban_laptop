@@ -1,5 +1,4 @@
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+const prisma = require("../utils/prisma");
 
 class ThuocTinhService {
   // Lọc lấy các trường thuộc tính hợp lệ
@@ -132,7 +131,7 @@ class ThuocTinhService {
       throw error;
     }
   }
-  
+
   // ==================== Tìm một Thuộc Tính dựa trên id ======================
   async findById(id) {
     return await prisma.thuoc_tinh.findUnique({

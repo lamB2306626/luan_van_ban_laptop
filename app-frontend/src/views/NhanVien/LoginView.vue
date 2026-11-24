@@ -36,10 +36,15 @@ export default {
       try {
         const response = await NhanVienService.login(credentials);
         // Lưu thông tin người dùng vào localStorage hoặc Vuex/Pinia
-        localStorage.setItem("user", JSON.stringify(response.user));
+        localStorage.setItem("adminUser", JSON.stringify(response.user));
 
         // Chuyển hướng sang trang quản trị / trang chủ
-        this.$router.push({ name: "danh-muc.home" });
+        const redirectPath = this.$route.query.redirect;
+        if (redirectPath) {
+          this.$router.push(redirectPath);
+        } else {
+          this.$router.push({ name: "admin.home" });
+        }
       } catch (error) {
         console.error("Lỗi đăng nhập:", error);
         this.errorMessage =

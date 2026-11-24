@@ -1,5 +1,5 @@
 <template>
-  <div class="container mt-3 col-md-6">
+  <div class="container mt-3">
     <h4>Thêm Mới Phiếu Nhập</h4>
 
     <PhieuNhapForm @submit:phieuNhap="createPhieuNhap" />

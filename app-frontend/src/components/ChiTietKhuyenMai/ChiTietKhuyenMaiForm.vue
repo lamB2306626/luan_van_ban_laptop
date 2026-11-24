@@ -1,7 +1,7 @@
 <template>
   <Form @submit="submitChiTiet" :validation-schema="chiTietFormSchema">
     <!-- Mã Chi Tiết & Mã Đợt KM (Hiển thị disabled khi Edit) -->
-    <div v-if="isEdit" class="row">
+    <div v-if="hasRealIds" class="row">
       <div class="col-md-6 form-group mb-3">
         <label for="id">Mã Chi Tiết:</label>
         <Field
@@ -37,24 +37,20 @@
           v-model="chiTietLocal.danh_sach_id_san_pham"
           v-slot="{ errors }"
         >
-          <BaseMultiSearchSelect
+          <ProductSelect
             v-if="!isEdit"
             v-model="chiTietLocal.danh_sach_id_san_pham"
+            :dsIdSanPhamDaApDung="dsIdSanPhamDaApDung"
             :options="dsSanPham"
-            label-key="ten_san_pham"
-            value-key="id"
-            placeholder="Nhập tên hoặc mã sản phẩm để tìm..."
-            :invalid="errors.length > 0"
           />
           <BaseSearchSelect
-          v-else
+            v-else
             v-model="chiTietLocal.id_san_pham"
             :options="dsSanPham"
             label-key="ten_san_pham"
             value-key="id"
-            placeholder="Nhập tên hoặc mã Sản Phẩm để tìm.kkkkkk.."
+            placeholder="Nhập tên hoặc mã Sản Phẩm để tìm..."
           >
-
             <!-- Custom lại cách hiển thị danh sách dạng [MÃ] TÊN -->
             <template #option="{ item }">
               <span class="fw-bold text-secondary">[{{ item.id }}]</span>
@@ -73,6 +69,7 @@
         <label for="loai_giam_gia">
           Loại Giảm Giá <span class="text-danger">*</span>:
         </label>
+
         <Field
           name="loai_giam_gia"
           as="select"
@@ -98,7 +95,7 @@
             placeholder="Nhập mức giảm"
           />
           <span class="input-group-text">
-            {{ chiTietLocal.loai_giam_gia === "PERCENT" ? "%" : "₫" }}
+            {{ chiTietLocal.loai_giam_gia === "PHAN_TRAM" ? "%" : "₫" }}
           </span>
         </div>
         <ErrorMessage name="gia_tri_giam" class="text-danger small" />
@@ -110,7 +107,7 @@
       <button type="button" class="btn btn-secondary me-2" @click="cancel">
         <i class="fas fa-times me-1"></i> Hủy
       </button>
-      <button type="submit" class="btn btn-primary">
+      <button class="btn btn-primary">
         <i class="fas fa-save me-1"></i>
         {{ isEdit ? "Cập nhật chi tiết" : "Thêm vào đợt khuyến mãi" }}
       </button>
@@ -121,8 +118,8 @@
 <script>
 import * as yup from "yup";
 import { Form, Field, ErrorMessage } from "vee-validate";
-import BaseMultiSearchSelect from "@/components/Common/BaseMultiSearchSelect.vue";
 import BaseSearchSelect from "@/components/Common/BaseSearchSelect.vue";
+import ProductSelect from "@/components/ChiTietKhuyenMai/ProductSelect.vue";
 
 // Import Service lấy danh sách Sản phẩm
 import SanPhamService from "@/services/san-pham.service";
@@ -133,8 +130,8 @@ export default {
     Form,
     Field,
     ErrorMessage,
-    BaseMultiSearchSelect,
     BaseSearchSelect,
+    ProductSelect,
   },
   props: {
     chiTiet: {
@@ -142,18 +139,28 @@ export default {
       default: () => ({
         id_dot_km: "",
         id_san_pham: "",
-        loai_giam_gia: "PERCENT",
+        loai_giam_gia: "PHAN_TRAM",
         gia_tri_giam: 0,
         danh_sach_id_san_pham: [],
       }),
     },
     isEdit: { type: Boolean, default: false },
+
+    // Mảng ID sản phẩm đã tồn tại từ cha xuống để disable không cho chọn lại
+    // sản phẩm đã áp dụng đợt khuyến mãi này trong form thêm mới
+    dsIdSanPhamDaApDung: {
+      type: Array,
+      default: () => [],
+    },
   },
   emits: ["submit:chiTiet", "cancel"],
   data() {
     // Schema kiểm tra tính hợp lệ dữ liệu
     const chiTietFormSchema = yup.object().shape({
-      id_san_pham: yup.string().required("Vui lòng chọn sản phẩm."),
+      danh_sach_id_san_pham: yup
+        .array()
+        .of(yup.mixed())
+        .min(1, "Vui lòng chọn ít nhất 1 sản phẩm áp dụng."),
       loai_giam_gia: yup.string().required("Vui lòng chọn loại giảm giá."),
       gia_tri_giam: yup
         .number()
@@ -161,13 +168,10 @@ export default {
         .required("Mức giảm giá không được để trống.")
         .min(0, "Mức giảm không được nhỏ hơn 0.")
         .when("loai_giam_gia", {
-          is: "PERCENT",
+          is: "PHAN_TRAM",
           then: (schema) =>
             schema.max(100, "Phần trăm giảm không được vượt quá 100%."),
         }),
-      danh_sach_id_san_pham: yup
-        .array()
-        .min(1, "Vui lòng chọn ít nhất 1 sản phẩm áp dụng."),
     });
 
     return {
@@ -177,33 +181,27 @@ export default {
       danh_sach_id_san_pham: [],
     };
   },
-  computed: {
-    // Sửa 3: Đưa chiTietFormSchema vào computed và validate đúng danh_sach_id_san_pham dạng Mảng
-    chiTietFormSchema() {
-      return yup.object().shape({
-        danh_sach_id_san_pham: yup
-          .array()
-          .min(1, "Vui lòng chọn ít nhất 1 sản phẩm áp dụng."),
-        loai_giam_gia: yup.string().required("Vui lòng chọn loại giảm giá."),
-        gia_tri_giam: yup
-          .number()
-          .typeError("Mức giảm phải là chữ số.")
-          .required("Mức giảm giá không được để trống.")
-          .min(0, "Mức giảm không được nhỏ hơn 0.")
-          .when("loai_giam_gia", {
-            is: "PERCENT",
-            then: (schema) =>
-              schema.max(100, "Phần trăm giảm không được vượt quá 100%."),
-          }),
-      });
-    },
-  },
+
   watch: {
     chiTiet: {
       handler(newVal) {
         this.chiTietLocal = { ...newVal };
       },
       deep: true,
+    },
+  },
+  computed: {
+    // Kiểm tra xem record có mã định danh thật từ DB hay không
+    hasRealIds() {
+      const id = this.chiTietLocal?.id;
+
+      // Nếu không có ID hoặc ID là mã tạm (bắt đầu bằng CT_TAM_) -> Ẩn
+      if (!id || (typeof id === "string" && id.startsWith("KM_TAM_"))) {
+        return false;
+      }
+
+      // Có ID thật từ DB -> Hiện
+      return true;
     },
   },
   methods: {
@@ -219,7 +217,40 @@ export default {
     },
 
     submitChiTiet() {
-      this.$emit("submit:chiTiet", this.chiTietLocal);
+      if (this.isEdit) {
+        // Chế độ sửa 1 sản phẩm đơn lẻ
+        this.$emit("submit:chiTiet", { ...this.chiTietLocal });
+      } else {
+        // Chế độ thêm mới hàng loạt: Bóc tách mảng ID thành mảng các object chi tiết
+        const selectedIds = this.chiTietLocal.danh_sach_id_san_pham || [];
+        const { loai_giam_gia, gia_tri_giam, id_dot_km } = this.chiTietLocal;
+
+        // Lấy danh sách object sản phẩm đầy đủ chỉ để phục vụ render bảng tạm ở giao diện
+        const danhSachSanPhamChiTiet = this.dsSanPham.filter((sp) =>
+          selectedIds.includes(sp.id),
+        );
+
+        // Bóc tách mảng ID thành mảng các object chi tiết SẠCH SẼ (Không chứa rác/object thừa)
+        const dsChiTietBocTach = selectedIds.map((idSanPham) => {
+          const spInfo = danhSachSanPhamChiTiet.find(
+            (sp) => sp.id === idSanPham,
+          );
+          return {
+            id_dot_km: id_dot_km || null,
+            id_san_pham: idSanPham,
+            loai_giam_gia: loai_giam_gia,
+            gia_tri_giam: Number(gia_tri_giam),
+            san_pham: spInfo
+              ? { id: spInfo.id, ten_san_pham: spInfo.ten_san_pham }
+              : null,
+          };
+        });
+
+        // Gửi mảng đã làm sạch ra ngoài cho component cha
+        this.$emit("submit:chiTiet", {
+          ds_chi_tiet: dsChiTietBocTach,
+        });
+      }
     },
 
     cancel() {

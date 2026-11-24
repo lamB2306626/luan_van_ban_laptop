@@ -1,5 +1,4 @@
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+const prisma = require("../utils/prisma");
 
 class BienTheService {
   // Lọc lấy các trường thuộc tính hợp lệ
@@ -18,7 +17,16 @@ class BienTheService {
           ? parseInt(payload.so_luong, 10)
           : undefined,
       duong_dan_anh: payload.duong_dan_anh,
-      trang_thai: payload.trang_thai,
+
+      trang_thai:
+        payload.trang_thai !== undefined
+          ? payload.trang_thai === true || payload.trang_thai === "true"
+          : undefined,
+
+      is_delete:
+        payload.is_delete !== undefined
+          ? payload.is_delete === true || payload.is_delete === "true"
+          : undefined,
     };
     Object.keys(bienThe).forEach(
       (key) => bienThe[key] === undefined && delete bienThe[key],
@@ -49,14 +57,23 @@ class BienTheService {
         giaGiamMax = giaGiamHienTai;
       }
     }
-    
+
     const donGiaApDung = Math.max(0, giaGoc - giaGiamMax);
 
-    const { chi_tiet_khuyen_mai, ...dataBienThe } = bienThe;
+    // BÓC TÁCH: Loại bỏ chi_tiet_khuyen_mai khỏi san_pham để JSON trả về gọn sạch
+    const { san_pham, ...dataBienThe } = bienThe;
+
+    let cleanSanPham = null;
+    if (san_pham) {
+      const { chi_tiet_khuyen_mai, ...dataSanPham } = san_pham;
+      cleanSanPham = dataSanPham;
+    }
 
     return {
       ...dataBienThe,
+      san_pham: cleanSanPham,
       don_gia_ap_dung: donGiaApDung,
+      so_tien_giam: giaGiamMax, // Trả thêm số tiền giảm nếu giao diện cần hiển thị
     };
   }
 
@@ -87,42 +104,104 @@ class BienTheService {
   }
 
   // 1. Tạo biến thể mới (Tự sinh mã BT01, BT02 nếu client không truyền id)
-  async create(payload) {
-    if (!payload.id) {
-      // Tìm 1 biến thể có ID lớn nhất hiện tại
-      const lastBienThe = await prisma.bien_the.findFirst({
+  async create(payload, externalTx = null) {
+    const execute = async (tx) => {
+      // Ép payload về dạng Mảng để xử lý đồng nhất
+      const items = Array.isArray(payload) ? payload : [payload];
+      if (items.length === 0) return [];
+
+      const results = [];
+
+      // Tìm 1 biến thể có ID lớn nhất hiện tại trong Database
+      const lastBienThe = await tx.bien_the.findFirst({
         orderBy: {
-          id: "desc", // Sắp xếp ID giảm dần (ví dụ: BT05, BT04, BT03...)
+          id: "desc", // Sắp xếp ID giảm dần (VD: BT05, BT04...)
         },
       });
 
-      if (!lastBienThe) {
-        // Nếu database chưa có biến thể nào
-        payload.id = "BT01";
-      } else {
-        // Lấy phần số ra khỏi chuỗi (VD: "BT05" -> lấy số 5)
-        const currentNumber =
-          parseInt(lastBienThe.id.replace(/\D/g, ""), 10) || 0;
-        // Cộng thêm 1 và format lại thành chuỗi BT06
-        payload.id = `BT${String(currentNumber + 1).padStart(2, "0")}`;
+      let currentNumber = lastBienThe
+        ? parseInt(lastBienThe.id.replace(/\D/g, ""), 10) || 0
+        : 0;
+
+      // Tập hợp các id_san_pham bị ảnh hưởng để kiểm tra cập nhật trạng thái sau khi tạo biến thể
+      const affectedProductIds = new Set();
+
+      for (const item of items) {
+        // Tự động tăng số đếm để sinh mã BT01, BT02 duy nhất cho từng item
+        if (!item.id) {
+          currentNumber += 1;
+          item.id = `BT${String(currentNumber).padStart(2, "0")}`;
+        }
+
+        const data = this.extractBienTheData(item);
+
+        // Tạo bản ghi biến thể mới
+        const newBienThe = await tx.bien_the.create({
+          data: {
+            ...data,
+            id: item.id, // Đảm bảo gán ID tự sinh
+          },
+          include: {
+            san_pham: true,
+            mau_sac: true,
+            cpu: true,
+            gpu: true,
+            dung_luong_ram: true,
+            dung_luong_rom: true,
+          },
+        });
+
+        results.push(newBienThe);
+
+        // Lưu lại id_san_pham của biến thể vừa tạo để check cập nhật trạng thái
+        if (newBienThe.id_san_pham) {
+          affectedProductIds.add(newBienThe.id_san_pham);
+        }
       }
-    }
 
-    const data = this.extractBienTheData(payload);
+      // KIỂM TRA VÀ CẬP NHẬT TRẠNG THÁI SẢN PHẨM TỪ DANG_HOAN_THIEN SANG DANG_KINH_DOANH
+      for (const productId of affectedProductIds) {
+        const sanPham = await tx.san_pham.findUnique({
+          where: { id: productId },
+          include: {
+            thong_so: true, // Kiểm tra xem đã có thông số chưa
+            bien_the: true, // Lấy danh sách biến thể hiện tại
+          },
+        });
+
+        // Điều kiện để được chuyển sang DANG_KINH_DOANH:
+        // 1. Sản phẩm đang ở trạng thái DANG_HOAN_THIEN
+        // 2. Đã có thông số kỹ thuật
+        // 3. Có ít nhất 1 biến thể (chắc chắn có vì vừa tạo xong, nhưng check tổng số lượng cho chắc chắn)
+        if (
+          sanPham &&
+          sanPham.trang_thai === "DANG_HOAN_THIEN" &&
+          sanPham.thong_so &&
+          sanPham.bien_the.length > 0
+        ) {
+          await tx.san_pham.update({
+            where: { id: productId },
+            data: { trang_thai: "DANG_KINH_DOANH" },
+          });
+        }
+      }
+
+      // Nếu client truyền 1 object thì trả về object, truyền mảng thì trả về mảng
+      return Array.isArray(payload) ? results : results[0];
+    };
+
     try {
-      return await prisma.bien_the.create({
-        data: data,
-        include: {
-          san_pham: true, // Trả về kèm thông tin sản phẩm liên kết
-          mau_sac: true,
-          cpu: true,
-          gpu: true,
-          dung_luong_ram: true,
-          dung_luong_rom: true,
-        },
-      });
+      // Nếu service cha (SanPhamService) truyền transaction `externalTx` vào thì dùng luôn,
+      // nếu không có thì tự mở transaction mới
+      if (externalTx) {
+        return await execute(externalTx);
+      } else {
+        return await prisma.$transaction(async (tx) => {
+          return await execute(tx);
+        });
+      }
     } catch (error) {
-      // Lỗi vi phạm khóa ngoại (P2003): id_san_pham truyền vào không tồn tại
+      // Lỗi vi phạm khóa ngoại (P2003): id_san_pham, id_cpu... không tồn tại
       if (error.code === "P2003") {
         throw new Error("KHOA_NGOAI_KHONG_TON_TAI");
       }
@@ -157,7 +236,13 @@ class BienTheService {
     }
 
     if (filterData.trang_thai !== undefined) {
-      where.trang_thai = filterData.trang_thai;
+      where.trang_thai =
+        filterData.trang_thai === "true" || filterData.trang_thai === true;
+    }
+
+    if (filterData.da_xoa !== undefined) {
+      where.is_delete =
+        filterData.da_xoa === "true" || filterData.da_xoa === true;
     }
 
     if (filterData.id_cpu) where.id_cpu = filterData.id_cpu;
@@ -170,6 +255,12 @@ class BienTheService {
       include: {
         san_pham: {
           include: {
+            anh_san_pham: {
+              where: {
+                la_anh_chinh: true,
+              },
+            },
+            nha_cung_cap_san_pham: true,
             chi_tiet_khuyen_mai: {
               where: {
                 dot_khuyen_mai: {
@@ -183,6 +274,7 @@ class BienTheService {
             },
           },
         },
+
         mau_sac: true,
         cpu: true,
         gpu: true,
@@ -215,6 +307,7 @@ class BienTheService {
           dung_luong_rom: true,
         },
       });
+
       return result;
     } catch (error) {
       // 1. Lỗi không tìm thấy bản ghi cần update => Mã lỗi của Prisma là P2025
@@ -234,31 +327,82 @@ class BienTheService {
   }
 
   // ======================== Xóa (khóa) Biến Thể dựa trên id ==============================
-  async delete(id) {
-    try {
-      // Đổi từ prisma.bien_the.delete sang update trang_thai -> false
-      const result = await prisma.bien_the.update({
+  async delete(id, externalTx = null) {
+    const execute = async (tx) => {
+      // 1. Tìm biến thể cần xóa trước để lấy id_san_pham trước khi cập nhật
+      const bienThe = await tx.bien_the.findUnique({
         where: { id: id },
-        data: { trang_thai: false },
       });
-      return result;
+
+      if (!bienThe) {
+        throw new Error("BIEN_THE_KHONG_TON_TAI");
+      }
+
+      const productId = bienThe.id_san_pham;
+
+      // 2. Thực hiện cập nhật cờ xóa mềm (is_delete: true) cho biến thể
+      const updatedBienThe = await tx.bien_the.update({
+        where: { id: id },
+        data: {
+          is_delete: true, // Đổi thành cờ is_delete: true theo yêu cầu
+        },
+      });
+
+      // 3. KIỂM TRA VÀ CẬP NHẬT TRẠNG THÁI SẢN PHẨM CHA
+      // Đếm xem sản phẩm này còn lại bao nhiêu biến thể CHƯA BỊ XÓA MỀM (is_delete: false)
+      const activeVariantsCount = await tx.bien_the.count({
+        where: {
+          id_san_pham: bienThe.id_san_pham,
+          is_delete: false,
+        },
+      });
+
+      // Lấy thông tin sản phẩm cha hiện tại
+      const sanPham = await tx.san_pham.findUnique({
+        where: { id: productId },
+      });
+
+      // Nếu sản phẩm đang DANG_KINH_DOANH mà số lượng biến thể hoạt động còn lại bằng 0
+      // thì tự động hạ cấp trạng thái sản phẩm xuống DANG_HOAN_THIEN
+      if (
+        sanPham &&
+        sanPham.trang_thai === "DANG_KINH_DOANH" &&
+        activeVariantsCount === 0
+      ) {
+        await tx.san_pham.update({
+          where: { id: productId },
+          data: { trang_thai: "DANG_HOAN_THIEN" },
+        });
+      }
+
+      return updatedBienThe;
+    };
+
+    try {
+      if (externalTx) {
+        return await execute(externalTx);
+      } else {
+        return await prisma.$transaction(async (tx) => {
+          return await execute(tx);
+        });
+      }
     } catch (error) {
-      if (error.code === "P2025") {
-        return null;
+      if (error.message === "BIEN_THE_KHONG_TON_TAI") {
+        throw error;
       }
       throw error;
     }
   }
 
-  // Khôi phục Biến Thể (chỉ cho phép nếu Sản Phẩm cha đang hoạt động)
-  async restore(id) {
-    try {
-      // 1. Tìm biến thể kèm theo trạng thái của Sản phẩm cha
+  // Khôi phục Biến Thể (chỉ cho phép nếu Sản Phẩm cha không bị xóa)
+  async restore(id, externalTx = null) {
+    const execute = async (tx) => {
+      // 1. Tìm biến thể kèm theo cờ id_delete của Sản phẩm cha
       const bienThe = await prisma.bien_the.findUnique({
         where: { id: id },
         include: {
           san_pham: {
-            select: { trang_thai: true },
+            select: { is_delete: true },
           },
         },
       });
@@ -268,15 +412,15 @@ class BienTheService {
         return null;
       }
 
-      // 2. Kiểm tra nếu Sản phẩm cha đang bị vô hiệu hóa (false)
-      if (!bienThe.san_pham?.trang_thai) {
-        throw new Error("SAN_PHAM_DANG_NGUNG_KINH_DOANH");
+      // 2. Kiểm tra nếu Sản phẩm cha đang bị xóa (is_delete=true)
+      if (bienThe.san_pham?.is_delete) {
+        throw new Error("SAN_PHAM_DA_XOA_KHOI_HE_THONG");
       }
 
-      // 3. Khôi phục trạng thái biến thể thành true
+      // 3. Khôi phục is_delete biến thể thành false
       const result = await prisma.bien_the.update({
         where: { id: id },
-        data: { trang_thai: true },
+        data: { is_delete: false },
         include: {
           san_pham: true,
           mau_sac: true,
@@ -287,7 +431,45 @@ class BienTheService {
         },
       });
 
+      // 4. KIỂM TRA VÀ CẬP NHẬT TRẠNG THÁI SẢN PHẨM CHA
+      // Đếm xem sản phẩm này còn lại bao nhiêu biến thể CHƯA BỊ XÓA MỀM (is_delete: false)
+      const activeVariantsCount = await tx.bien_the.count({
+        where: {
+          id_san_pham: bienThe.id_san_pham,
+          is_delete: false,
+        },
+      });
+
+      // Lấy thông tin sản phẩm cha hiện tại
+      const sanPham = await tx.san_pham.findUnique({
+        where: { id: bienThe.id_san_pham },
+      });
+
+      console.log(sanPham, activeVariantsCount);
+      // Nếu sản phẩm đang DANG_HOAN_THIEN mà số lượng biến thể hoạt động lớn hơn 0
+      // thì tự động hạ nâng trạng thái sản phẩm xuống DANG_HOAT_DONG
+      if (
+        sanPham &&
+        sanPham.trang_thai === "DANG_HOAN_THIEN" &&
+        activeVariantsCount > 0
+      ) {
+        await tx.san_pham.update({
+          where: { id: bienThe.id_san_pham },
+          data: { trang_thai: "DANG_KINH_DOANH" },
+        });
+      }
+
       return result;
+    };
+
+    try {
+      if (externalTx) {
+        return await execute(externalTx);
+      } else {
+        return await prisma.$transaction(async (tx) => {
+          return await execute(tx);
+        });
+      }
     } catch (error) {
       if (error.code === "P2025") {
         return null;
@@ -297,17 +479,17 @@ class BienTheService {
   }
 
   // ====================== Xóa (khóa) tất cả các Biến Thể ========================
-  async deleteAll() {
-    const result = await prisma.bien_the.updateMany({
-      where: {
-        trang_thai: true,
-      },
-      data: {
-        trang_thai: false,
-      },
-    });
-    return result.count;
-  }
+  // async deleteAll() {
+  //   const result = await prisma.bien_the.updateMany({
+  //     where: {
+  //       trang_thai: true,
+  //     },
+  //     data: {
+  //       trang_thai: false,
+  //     },
+  //   });
+  //   return result.count;
+  // }
 
   // ==================== Tìm một Biến Thể dựa trên id (gọi lại hàm find để có thể lấy được luôn giá khuyến mãi) ======================
   async findById(id, tx) {
@@ -317,4 +499,3 @@ class BienTheService {
 }
 
 module.exports = BienTheService;
-

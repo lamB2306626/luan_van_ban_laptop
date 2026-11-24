@@ -1,5 +1,4 @@
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+const prisma = require("../utils/prisma");
 
 class DiaChiService {
   // Lọc lấy các trường thuộc tính hợp lệ của Địa chỉ
@@ -9,7 +8,15 @@ class DiaChiService {
       id_khach_hang: payload.id_khach_hang,
       ten_nguoi_nhan: payload.ten_nguoi_nhan,
       sdt_nguoi_nhan: payload.sdt_nguoi_nhan,
-      dia_chi: payload.dia_chi,
+
+      province_id: payload.province_id,
+      district_id: payload.district_id,
+      ward_code: payload.ward_code,
+      ten_tinh: payload.ten_tinh,
+      ten_huyen: payload.ten_huyen,
+      ten_xa: payload.ten_xa,
+
+      dia_chi_cu_the: payload.dia_chi_cu_the,
       la_mac_dinh:
         payload.la_mac_dinh !== undefined
           ? Boolean(payload.la_mac_dinh)
